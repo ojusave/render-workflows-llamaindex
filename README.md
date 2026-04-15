@@ -38,7 +38,7 @@ Browser ──upload──▶ Web Service ──trigger──▶ Render Workflow
                     Serve UI ◀─── query ◀── Render Postgres (pgvector)
 ```
 
-**Tech stack**: [Express](https://expressjs.com) on Node.js, [@llamaindex/llama-cloud](https://www.npmjs.com/package/@llamaindex/llama-cloud) TypeScript SDK, [@renderinc/sdk](https://www.npmjs.com/package/@renderinc/sdk) for Workflows, [pg](https://www.npmjs.com/package/pg) for Postgres.
+**Tech stack**: [Express](https://expressjs.com) on Node.js with [multer](https://www.npmjs.com/package/multer) for file uploads, [@llamaindex/llama-cloud](https://www.npmjs.com/package/@llamaindex/llama-cloud) TypeScript SDK, [@renderinc/sdk](https://www.npmjs.com/package/@renderinc/sdk) for Workflows, [pg](https://www.npmjs.com/package/pg) for Postgres. SSE streaming uses native `res.write()` for real-time progress.
 
 ## Prerequisites
 
@@ -64,7 +64,7 @@ You will be prompted for `RENDER_API_KEY` and `LLAMA_CLOUD_API_KEY` during deplo
 
 1. Go to [Render Dashboard](https://dashboard.render.com) > New > Workflow
 2. Connect this repository
-3. Set the build command: `npm install && npm run build`
+3. Set the build command: `npm install && npm run build` (this compiles TypeScript and copies static assets to `dist/`)
 4. Set the start command: `node dist/tasks/index.js`
 5. Name it to match the `WORKFLOW_SLUG` env var (default: `render-workflows-llamaindex-workflow`)
 6. Add these environment variables:
@@ -152,3 +152,5 @@ render.yaml                  Render Blueprint: web service + Postgres
 **LlamaCloud rate limits**: the pipeline uses the agentic parsing tier, which has rate limits. If you hit 429 errors, the tasks retry automatically (up to 2 retries with exponential backoff). Check your [LlamaCloud usage dashboard](https://cloud.llamaindex.ai) for quota status.
 
 **Search returns poor results**: the default [`shared/embedding.ts`](shared/embedding.ts) uses a placeholder hash, not real embeddings. Semantic search will not be meaningful until you swap it for an actual embedding API.
+
+**Documents stuck at "processing"**: if the pipeline errors mid-run, the document is automatically marked as failed. If you see old documents stuck at "processing" from before this fix, delete them from the detail view and re-upload.
