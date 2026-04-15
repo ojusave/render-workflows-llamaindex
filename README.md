@@ -16,7 +16,6 @@ Upload PDFs and other documents. A Render Workflow runs LlamaCloud classify, par
 - [How it works](#how-it-works)
 - [Operations](#operations)
 - [Project structure](#project-structure)
-- [Extending](#extending)
 - [Community](#community)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -116,10 +115,6 @@ static/index.html            Frontend UI
 render.yaml                  Render Blueprint
 ```
 
-## Extending
-
-**Add a document type**: add a rule to [`tasks/classify.ts`](tasks/classify.ts) and a matching schema to [`tasks/schemas.ts`](tasks/schemas.ts). The extract task picks the schema automatically.
-
 ## Community
 
 Questions about Render, workflows, or troubleshooting a deploy: join the [Render Developers Discord](https://discord.gg/gvC7ceS9YS).
@@ -142,7 +137,7 @@ Questions about Render, workflows, or troubleshooting a deploy: join the [Render
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for issues, pull requests, and how to validate changes.
+See [CONTRIBUTING.md](CONTRIBUTING.md): issues, pull requests, validation, and **adding a document type** (classify rules + schemas).
 
 ## License
 
