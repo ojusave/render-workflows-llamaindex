@@ -271,7 +271,10 @@
     <div id="sidebar">
       <div class="sidebar-header">
         <h3>Documents</h3>
-        <button class="header-btn" onclick="pipelineRunning = false; showView('welcome')" style="font-size:0.7rem">+ Upload</button>
+        <div style="display:flex;gap:0.25rem">
+          <button class="header-btn" onclick="pipelineRunning = false; showView('search')" style="font-size:0.7rem">Ask</button>
+          <button class="header-btn" onclick="pipelineRunning = false; showView('welcome')" style="font-size:0.7rem">+ Upload</button>
+        </div>
       </div>
       <div id="doc-list">
         <div class="sidebar-empty">No documents yet.<br/>Upload a file to get started.</div>
@@ -316,8 +319,21 @@
         </div>
 
         <div id="search-view" style="display:none; width:100%; max-width:720px;">
+          <h3 style="font-size:0.9rem;font-weight:600;color:var(--text-strong);margin-bottom:0.75rem">Ask your documents</h3>
+          <div class="search-bar" style="margin-bottom:1rem">
+            <input type="text" id="ask-input" placeholder="What are the payment terms in my contracts?" />
+            <button onclick="doAsk()">Ask</button>
+          </div>
+          <div id="ask-result" style="display:none" class="result-card">
+            <h3>Answer</h3>
+            <div id="ask-answer" style="font-size:0.85rem;color:var(--text);line-height:1.7;white-space:pre-wrap"></div>
+            <div id="ask-sources" style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border)">
+              <h3 style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-dim);margin-bottom:0.5rem">Sources</h3>
+            </div>
+          </div>
+          <h3 style="font-size:0.9rem;font-weight:600;color:var(--text-strong);margin-top:1.5rem;margin-bottom:0.75rem">Search</h3>
           <div class="search-bar">
-            <input type="text" id="search-input" placeholder="Search across all documents..." />
+            <input type="text" id="search-input" placeholder="Search for specific text across documents..." />
             <button onclick="doSearch()">Search</button>
           </div>
           <div id="search-results" class="search-results"></div>
@@ -641,7 +657,7 @@
             el.classList.remove('active');
             el.classList.add('done');
           });
-          addActivity(feed, 'Pipeline complete in <strong>' + data.elapsed + 's</strong>: ' + data.chunksStored + ' chunks indexed in <strong>pgvector</strong>', 'done');
+          addActivity(feed, 'Pipeline complete in <strong>' + data.elapsed + 's</strong>.' + (data.indexed ? ' Indexed in <strong>LlamaCloud</strong> for search.' : ''), 'done');
           renderSummary(resultSection, data);
           break;
 
@@ -673,7 +689,7 @@
         <div class="stats-row">
           <div class="stat-box"><div class="stat-value">${data.pageCount}</div><div class="stat-label">Pages</div></div>
           <div class="stat-box"><div class="stat-value">${data.fieldsExtracted}</div><div class="stat-label">Fields</div></div>
-          <div class="stat-box"><div class="stat-value">${data.chunksStored}</div><div class="stat-label">Chunks</div></div>
+          <div class="stat-box"><div class="stat-value">${data.indexed ? 'Yes' : 'No'}</div><div class="stat-label">Indexed</div></div>
           <div class="stat-box"><div class="stat-value">${data.elapsed}s</div><div class="stat-label">Duration</div></div>
         </div>
       `;
@@ -781,6 +797,50 @@
       loadDocuments();
     }
 
+    document.getElementById('ask-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doAsk();
+    });
+
+    async function doAsk() {
+      const question = document.getElementById('ask-input').value.trim();
+      if (!question) return;
+
+      const resultEl = document.getElementById('ask-result');
+      const answerEl = document.getElementById('ask-answer');
+      const sourcesEl = document.getElementById('ask-sources');
+      resultEl.style.display = 'block';
+      answerEl.textContent = 'Searching your documents...';
+      sourcesEl.innerHTML = '';
+
+      try {
+        const res = await fetch('/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question }),
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          answerEl.textContent = data.error;
+          return;
+        }
+
+        answerEl.textContent = data.answer || 'No answer generated.';
+
+        if (data.sources && data.sources.length > 0) {
+          sourcesEl.innerHTML = '<h3 style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-dim);margin-bottom:0.5rem">Sources (' + data.sources.length + ' passages)</h3>' +
+            data.sources.map((s, i) => `
+              <div style="font-size:0.75rem;color:var(--text-muted);padding:0.5rem 0;border-bottom:1px solid var(--border)">
+                <span style="font-size:0.65rem;color:var(--text-dim)">[${i + 1}] ${s.score ? (s.score * 100).toFixed(0) + '% match' : ''}</span>
+                <div style="margin-top:0.25rem">${escapeHtml(s.text)}</div>
+              </div>
+            `).join('');
+        }
+      } catch (e) {
+        answerEl.textContent = 'Failed to get answer.';
+      }
+    }
+
     async function doSearch() {
       const query = document.getElementById('search-input').value.trim();
       if (!query) return;
@@ -793,20 +853,25 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query }),
         });
-        const results = await res.json();
+        const data = await res.json();
 
-        if (!results.length) {
+        if (data.error) {
+          container.innerHTML = '<div style="color:var(--red);font-size:0.8rem">' + escapeHtml(data.error) + '</div>';
+          return;
+        }
+
+        if (!data.length) {
           container.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem">No results found.</div>';
           return;
         }
 
-        container.innerHTML = results.map(r => `
-          <div class="search-result-item" onclick="showDocument(${r.document_id})">
+        container.innerHTML = data.map(r => `
+          <div class="search-result-item">
             <div style="display:flex;justify-content:space-between;align-items:center">
-              <span class="sr-filename">${escapeHtml(r.filename)}</span>
-              <span class="sr-score">${(r.score * 100).toFixed(1)}% match</span>
+              <span class="sr-filename">${escapeHtml(r.metadata?.filename || 'Document')}</span>
+              <span class="sr-score">${r.score ? (r.score * 100).toFixed(1) + '% match' : ''}</span>
             </div>
-            <div class="sr-text">${escapeHtml(r.chunk_text.slice(0, 200))}...</div>
+            <div class="sr-text">${escapeHtml((r.text || '').slice(0, 300))}</div>
           </div>
         `).join('');
       } catch (e) {

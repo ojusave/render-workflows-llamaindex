@@ -1,7 +1,7 @@
 /**
  * Express web server for the document intelligence pipeline.
  * SSE streaming uses native res.write() which flushes immediately.
- * File uploads handled by multer, stored in .uploads/ during processing.
+ * File uploads handled by multer. Search and RAG via LlamaCloud pipelines.
  */
 
 import express from "express";
@@ -10,6 +10,7 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import LlamaCloud from "@llamaindex/llama-cloud";
 
 import {
   initDb,
@@ -18,14 +19,14 @@ import {
   getDocument,
   deleteDocument,
   updateDocumentError,
-  searchDocuments,
 } from "./shared/db.js";
-import { placeholderEmbedding } from "./shared/embedding.js";
 import { runPipeline } from "./pipeline/orchestrator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, ".uploads");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const PIPELINE_ID = process.env.LLAMACLOUD_PIPELINE_ID;
 
 const upload = multer({ dest: UPLOAD_DIR });
 const app = express();
@@ -33,22 +34,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
-});
+function getLlamaClient(): LlamaCloud {
+  return new LlamaCloud({ apiKey: process.env.LLAMA_CLOUD_API_KEY! });
+}
 
-app.post("/upload", upload.single("file"), async (req, res) => {
-  const file = req.file;
-  if (!file) {
-    res.status(400).json({ error: "No file provided" });
-    return;
-  }
-
-  const filename = file.originalname || "document";
-  const tempPath = file.path;
-
-  const documentId = await insertDocument(filename);
-
+function sseHeaders(res: express.Response) {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
@@ -56,10 +46,16 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     "X-Accel-Buffering": "no",
   });
   res.flushHeaders();
-
-  // Send an initial comment to force the connection open
   res.write(":ok\n\n");
+}
 
+async function streamPipeline(
+  res: express.Response,
+  documentId: number,
+  tempPath: string,
+  filename: string
+) {
+  sseHeaders(res);
   try {
     for await (const event of runPipeline(documentId, tempPath, filename)) {
       res.write(event);
@@ -70,16 +66,24 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     await updateDocumentError(documentId, message);
     res.write(`event: error\ndata: ${JSON.stringify({ message, documentId })}\n\n`);
   }
-
   res.end();
+}
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.post("/upload", upload.single("file"), async (req, res) => {
+  const file = req.file;
+  if (!file) { res.status(400).json({ error: "No file provided" }); return; }
+  const filename = file.originalname || "document";
+  const documentId = await insertDocument(filename);
+  await streamPipeline(res, documentId, file.path, filename);
 });
 
 app.post("/upload-url", async (req, res) => {
   const { url } = req.body;
-  if (!url) {
-    res.status(400).json({ error: "No URL provided" });
-    return;
-  }
+  if (!url) { res.status(400).json({ error: "No URL provided" }); return; }
 
   const parsedUrl = new URL(url);
   const filename = path.basename(parsedUrl.pathname) || "document.pdf";
@@ -91,8 +95,7 @@ app.post("/upload-url", async (req, res) => {
       res.status(400).json({ error: `Failed to download: HTTP ${response.status}` });
       return;
     }
-    const buffer = Buffer.from(await response.arrayBuffer());
-    fs.writeFileSync(tempPath, buffer);
+    fs.writeFileSync(tempPath, Buffer.from(await response.arrayBuffer()));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(400).json({ error: `Failed to download: ${message}` });
@@ -100,28 +103,7 @@ app.post("/upload-url", async (req, res) => {
   }
 
   const documentId = await insertDocument(filename);
-
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "X-Accel-Buffering": "no",
-  });
-  res.flushHeaders();
-  res.write(":ok\n\n");
-
-  try {
-    for await (const event of runPipeline(documentId, tempPath, filename)) {
-      res.write(event);
-      if (typeof (res as any).flush === "function") (res as any).flush();
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    await updateDocumentError(documentId, message);
-    res.write(`event: error\ndata: ${JSON.stringify({ message, documentId })}\n\n`);
-  }
-
-  res.end();
+  await streamPipeline(res, documentId, tempPath, filename);
 });
 
 app.get("/documents", async (_req, res) => {
@@ -132,7 +114,6 @@ app.get("/documents", async (_req, res) => {
 app.get("/documents/:id", async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
-
   const doc = await getDocument(id);
   if (!doc) { res.status(404).json({ error: "Not found" }); return; }
   res.json(doc);
@@ -141,7 +122,6 @@ app.get("/documents/:id", async (req, res) => {
 app.delete("/documents/:id", async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
-
   const deleted = await deleteDocument(id);
   if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
   res.json({ status: "ok" });
@@ -151,9 +131,79 @@ app.post("/search", async (req, res) => {
   const { query } = req.body;
   if (!query) { res.status(400).json({ error: "Query is required" }); return; }
 
-  const queryEmbedding = placeholderEmbedding(query);
-  const results = await searchDocuments(queryEmbedding);
-  res.json(results);
+  if (!PIPELINE_ID) {
+    res.status(503).json({ error: "Search not configured: set LLAMACLOUD_PIPELINE_ID" });
+    return;
+  }
+
+  try {
+    const client = getLlamaClient();
+    const result = await client.pipelines.retrieve(PIPELINE_ID, {
+      query,
+      retrieval_mode: "chunks",
+      dense_similarity_top_k: 10,
+      enable_reranking: true,
+      rerank_top_n: 5,
+    });
+
+    const results = result.retrieval_nodes.map((node) => ({
+      text: node.node.text ?? "",
+      score: node.score,
+      metadata: (node.node as any).metadata ?? {},
+    }));
+
+    res.json(results);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+app.post("/ask", async (req, res) => {
+  const { question } = req.body;
+  if (!question) { res.status(400).json({ error: "Question is required" }); return; }
+
+  if (!PIPELINE_ID) {
+    res.status(503).json({ error: "RAG not configured: set LLAMACLOUD_PIPELINE_ID" });
+    return;
+  }
+
+  try {
+    const client = getLlamaClient();
+
+    const retrieval = await client.pipelines.retrieve(PIPELINE_ID, {
+      query: question,
+      retrieval_mode: "chunks",
+      dense_similarity_top_k: 8,
+      enable_reranking: true,
+      rerank_top_n: 4,
+    });
+
+    const context = retrieval.retrieval_nodes
+      .map((node, i) => `[${i + 1}] ${node.node.text ?? ""}`)
+      .join("\n\n");
+
+    const sources = retrieval.retrieval_nodes.map((node) => ({
+      text: (node.node.text ?? "").slice(0, 200),
+      score: node.score,
+      metadata: (node.node as any).metadata ?? {},
+    }));
+
+    // Use LlamaCloud's chat completion or fall back to returning context for the frontend
+    // For now, return the retrieved context and sources so the frontend can display them
+    // A production version would call an LLM here for synthesis
+    res.json({
+      question,
+      context,
+      sources,
+      answer: sources.length > 0
+        ? `Based on ${sources.length} relevant passages from your documents:\n\n${context}`
+        : "No relevant documents found. Upload some documents first.",
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
 });
 
 app.use(express.static(path.join(__dirname, "static"), { maxAge: 0, etag: false }));

@@ -1,7 +1,6 @@
 /**
- * Workflow task: persist all pipeline results into Postgres.
- * Writes classification metadata, parsed markdown, extracted fields,
- * and text chunks with embeddings for pgvector semantic search.
+ * Workflow task: persist pipeline results into Postgres and index
+ * the parsed text in a LlamaCloud managed pipeline for semantic search.
  */
 
 import { task } from "@renderinc/sdk/workflows";
@@ -9,28 +8,12 @@ import {
   updateDocumentClassification,
   updateDocumentParsed,
   updateDocumentExtracted,
-  insertChunk,
+  updateDocumentFileId,
 } from "../shared/db.js";
-import { placeholderEmbedding } from "../shared/embedding.js";
+import { getLlamaClient } from "./llama-client.js";
 
-const CHUNK_SIZE = parseInt(process.env.CHUNK_SIZE || "1000", 10);
-const CHUNK_OVERLAP = parseInt(process.env.CHUNK_OVERLAP || "200", 10);
+const PIPELINE_ID = process.env.LLAMACLOUD_PIPELINE_ID;
 
-function chunkText(text: string): string[] {
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < text.length) {
-    const end = Math.min(start + CHUNK_SIZE, text.length);
-    chunks.push(text.slice(start, end));
-    start += CHUNK_SIZE - CHUNK_OVERLAP;
-  }
-  return chunks;
-}
-
-/**
- * Store all pipeline results into Postgres:
- * classification metadata, parsed content, extracted fields, and text chunks with embeddings.
- */
 export const storeResults = task(
   {
     name: "store_results",
@@ -40,10 +23,11 @@ export const storeResults = task(
   },
   async function storeResults(
     documentId: number,
+    fileId: string,
     classification: { docType: string; confidence: number; reasoning: string },
     parsed: { markdown: string; text: string; pages: Array<{ pageNumber: number; markdown: string }> },
     extracted: { extractedData: Record<string, unknown>; schemaUsed: Record<string, unknown> }
-  ): Promise<{ chunksStored: number }> {
+  ): Promise<{ indexed: boolean }> {
     await updateDocumentClassification(
       documentId,
       classification.docType,
@@ -52,20 +36,29 @@ export const storeResults = task(
     );
 
     await updateDocumentParsed(documentId, parsed.markdown, parsed.text);
-
     await updateDocumentExtracted(documentId, extracted.extractedData);
+    await updateDocumentFileId(documentId, fileId);
 
-    const textToChunk = parsed.text || parsed.markdown;
-    const chunks = chunkText(textToChunk);
+    if (PIPELINE_ID) {
+      const client = getLlamaClient();
+      const textToIndex = parsed.text || parsed.markdown;
+      await client.pipelines.documents.upsert(PIPELINE_ID, {
+        body: [
+          {
+            id: `doc-${documentId}`,
+            text: textToIndex,
+            metadata: {
+              document_id: documentId,
+              filename: parsed.pages[0]?.markdown?.slice(0, 50) || `document-${documentId}`,
+              doc_type: classification.docType,
+            },
+          },
+        ],
+      });
 
-    for (let i = 0; i < chunks.length; i++) {
-      const embedding = placeholderEmbedding(chunks[i]);
-      const pageNumber = parsed.pages.length > 0
-        ? parsed.pages[Math.min(i, parsed.pages.length - 1)].pageNumber
-        : null;
-      await insertChunk(documentId, chunks[i], embedding, pageNumber);
+      return { indexed: true };
     }
 
-    return { chunksStored: chunks.length };
+    return { indexed: false };
   }
 );

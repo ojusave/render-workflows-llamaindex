@@ -24,6 +24,11 @@ services:
         required: true
         sensitive: true
         sync: false
+      - key: LLAMACLOUD_PIPELINE_ID
+        displayName: LlamaCloud Pipeline ID
+        description: "Optional: LlamaCloud pipeline ID for semantic search and RAG. Create one at https://cloud.llamaindex.ai"
+        required: false
+        sync: false
       - key: DATABASE_URL
         fromDatabase:
           name: llamaindex-docs-db

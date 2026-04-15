@@ -136,18 +136,19 @@ export async function* runPipeline(
       data: extracted.extractedData,
     });
 
-    // Step 4: Store
+    // Step 4: Store + index in LlamaCloud pipeline
     yield sse("status", {
       phase: "storing",
-      tools: ["Render Postgres", "pgvector", "Render Workflows"],
+      tools: ["Render Postgres", "LlamaCloud Index", "Render Workflows"],
     });
 
     const stored = (await startAndWait("store_results", [
       documentId,
+      fileId,
       classification,
       parsed,
       extracted,
-    ])) as { chunksStored: number };
+    ])) as { indexed: boolean };
 
     const elapsed = Math.round((Date.now() - t0) / 1000);
 
@@ -158,7 +159,7 @@ export async function* runPipeline(
       confidence: classification.confidence,
       pageCount: parsed.pageCount,
       fieldsExtracted: Object.keys(extracted.extractedData).length,
-      chunksStored: stored.chunksStored,
+      indexed: stored.indexed,
       elapsed,
     });
   } catch (err) {
