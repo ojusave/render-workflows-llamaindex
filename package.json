@@ -1,0 +1,29 @@
+{
+  "name": "render-workflows-llamaindex",
+  "version": "1.0.0",
+  "description": "Document intelligence pipeline powered by LlamaCloud and Render Workflows",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "start:tasks": "node dist/tasks/index.js",
+    "dev": "tsx watch main.ts",
+    "dev:tasks": "tsx tasks/index.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "@llamaindex/llama-cloud": "^2.3.0",
+    "@renderinc/sdk": "^0.5.0",
+    "hono": "^4.7.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
