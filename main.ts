@@ -102,9 +102,10 @@ app.post("/search", async (req, res) => {
   res.json(results);
 });
 
-app.use(express.static(path.join(ROOT_DIR, "static")));
+app.use(express.static(path.join(ROOT_DIR, "static"), { maxAge: 0, etag: false }));
 
 app.get("/", (_req, res) => {
+  res.set("Cache-Control", "no-store");
   res.sendFile(path.join(ROOT_DIR, "static", "index.html"));
 });
 
