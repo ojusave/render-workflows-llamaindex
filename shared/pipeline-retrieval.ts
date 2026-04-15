@@ -6,6 +6,21 @@
 
 import { getLlamaClient } from "./llama-client.js";
 
+function formatApiError(err: unknown): string {
+  if (err instanceof Error) {
+    const e = err as Error & {
+      error?: { detail?: unknown; message?: unknown };
+    };
+    if (e.error?.detail !== undefined) {
+      return typeof e.error.detail === "string"
+        ? e.error.detail
+        : JSON.stringify(e.error.detail);
+    }
+    return e.message;
+  }
+  return String(err);
+}
+
 export type RetrievalHit = {
   text: string;
   score: number | null | undefined;
@@ -19,50 +34,53 @@ export async function retrieveFromConfiguredPipeline(
   rerankN: number
 ): Promise<RetrievalHit[]> {
   const client = getLlamaClient();
-  const meta = await client.pipelines.get(pipelineId);
+  try {
+    const meta = await client.pipelines.get(pipelineId);
 
-  if (meta.pipeline_type === "MANAGED") {
-    const result = await client.pipelines.retrieve(pipelineId, {
+    if (meta.pipeline_type === "MANAGED") {
+      const result = await client.pipelines.retrieve(pipelineId, {
+        query,
+        retrieval_mode: "chunks",
+        dense_similarity_top_k: topK,
+        enable_reranking: true,
+        rerank_top_n: rerankN,
+      });
+      return result.retrieval_nodes.map((node) => ({
+        text: node.node.text ?? "",
+        score: node.score,
+        metadata: ((node.node as Record<string, unknown>).metadata ??
+          {}) as Record<string, unknown>,
+      }));
+    }
+
+    const composite = await client.retrievers.search({
       query,
-      retrieval_mode: "chunks",
-      dense_similarity_top_k: topK,
-      enable_reranking: true,
-      rerank_top_n: rerankN,
-    });
-    return result.retrieval_nodes.map((node) => ({
-      text: node.node.text ?? "",
-      score: node.score,
-      metadata: ((node.node as Record<string, unknown>).metadata ??
-        {}) as Record<string, unknown>,
-    }));
-  }
-
-  // PLAYGROUND (default in LlamaCloud UI) and any non-MANAGED type
-  const composite = await client.retrievers.search({
-    query,
-    pipelines: [
-      {
-        pipeline_id: pipelineId,
-        name: null,
-        description: null,
-        preset_retrieval_parameters: {
-          retrieval_mode: "chunks",
-          dense_similarity_top_k: topK,
-          enable_reranking: true,
-          rerank_top_n: rerankN,
+      pipelines: [
+        {
+          pipeline_id: pipelineId,
+          name: null,
+          description: null,
+          preset_retrieval_parameters: {
+            retrieval_mode: "chunks",
+            dense_similarity_top_k: topK,
+            enable_reranking: true,
+            rerank_top_n: rerankN,
+          },
         },
-      },
-    ],
-    rerank_config: { top_n: rerankN, type: "system_default" },
-  });
+      ],
+      rerank_config: { top_n: rerankN, type: "system_default" },
+    });
 
-  const nodes = composite.nodes ?? [];
-  return nodes.map((item) => {
-    const inner = item.node;
-    return {
-      text: inner?.text ?? "",
-      score: item.score,
-      metadata: (inner?.metadata ?? {}) as Record<string, unknown>,
-    };
-  });
+    const nodes = composite.nodes ?? [];
+    return nodes.map((item) => {
+      const inner = item.node;
+      return {
+        text: inner?.text ?? "",
+        score: item.score,
+        metadata: (inner?.metadata ?? {}) as Record<string, unknown>,
+      };
+    });
+  } catch (err) {
+    throw new Error(formatApiError(err));
+  }
 }

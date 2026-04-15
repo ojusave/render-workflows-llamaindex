@@ -3,6 +3,7 @@
  * the parsed text in a LlamaCloud managed pipeline for semantic search.
  */
 
+import path from "path";
 import { task } from "@renderinc/sdk/workflows";
 import {
   updateDocumentClassification,
@@ -26,7 +27,8 @@ export const storeResults = task(
     fileId: string,
     classification: { docType: string; confidence: number; reasoning: string },
     parsed: { markdown: string; text: string; pages: Array<{ pageNumber: number; markdown: string }> },
-    extracted: { extractedData: Record<string, unknown>; schemaUsed: Record<string, unknown> }
+    extracted: { extractedData: Record<string, unknown>; schemaUsed: Record<string, unknown> },
+    filename: string
   ): Promise<{ indexed: boolean }> {
     await updateDocumentClassification(
       documentId,
@@ -40,23 +42,32 @@ export const storeResults = task(
     await updateDocumentFileId(documentId, fileId);
 
     if (PIPELINE_ID) {
-      const client = getLlamaClient();
-      const textToIndex = parsed.text || parsed.markdown;
-      await client.pipelines.documents.upsert(PIPELINE_ID, {
-        body: [
-          {
-            id: `doc-${documentId}`,
-            text: textToIndex,
-            metadata: {
-              document_id: documentId,
-              filename: parsed.pages[0]?.markdown?.slice(0, 50) || `document-${documentId}`,
-              doc_type: classification.docType,
-            },
-          },
-        ],
-      });
+      const textToIndex = (parsed.text || parsed.markdown || "").trim();
+      if (textToIndex.length === 0) {
+        return { indexed: false };
+      }
 
-      return { indexed: true };
+      const client = getLlamaClient();
+      try {
+        await client.pipelines.documents.upsert(PIPELINE_ID, {
+          body: [
+            {
+              id: `doc-${documentId}`,
+              text: textToIndex,
+              metadata: {
+                document_id: documentId,
+                filename: path.basename(filename) || `document-${documentId}`,
+                doc_type: classification.docType,
+              },
+            },
+          ],
+        });
+        return { indexed: true };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[store_results] LlamaCloud upsert failed for document ${documentId}:`, msg);
+        return { indexed: false };
+      }
     }
 
     return { indexed: false };

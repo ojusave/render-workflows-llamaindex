@@ -6,9 +6,7 @@
   "scripts": {
     "build": "tsc && cp -r static dist/static",
     "start": "node dist/main.js",
-    "start:tasks": "node dist/tasks/index.js",
-    "dev": "tsx watch main.ts",
-    "dev:tasks": "tsx tasks/index.ts"
+    "start:tasks": "node dist/tasks/index.js"
   },
   "dependencies": {
     "@llamaindex/llama-cloud": "^2.3.0",
@@ -24,7 +22,6 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
-    "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   },
   "engines": {

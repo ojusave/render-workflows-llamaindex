@@ -28,8 +28,9 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const PIPELINE_ID = process.env.LLAMACLOUD_PIPELINE_ID;
 
+/** Default 100 MB: large PDFs (e.g. full Bibles) exceed smaller demo caps. Override with MAX_UPLOAD_BYTES. */
 const MAX_UPLOAD_BYTES = parseInt(
-  process.env.MAX_UPLOAD_BYTES || String(15 * 1024 * 1024),
+  process.env.MAX_UPLOAD_BYTES || String(100 * 1024 * 1024),
   10
 );
 const upload = multer({ dest: UPLOAD_DIR, limits: { fileSize: MAX_UPLOAD_BYTES } });
@@ -47,6 +48,24 @@ function sseHeaders(res: express.Response) {
   });
   res.flushHeaders();
   res.write(":ok\n\n");
+}
+
+/** URL paths often lack an extension; LlamaCloud needs one for file type detection. */
+function filenameWithExtFromContentType(
+  basename: string,
+  contentType: string | null | undefined
+): string {
+  if (path.extname(basename)) return basename;
+  const ct = (contentType ?? "").toLowerCase();
+  if (ct.includes("pdf")) return `${basename}.pdf`;
+  if (ct.includes("html")) return `${basename}.html`;
+  if (ct.includes("markdown")) return `${basename}.md`;
+  if (ct.includes("wordprocessingml") || ct.includes("msword")) return `${basename}.docx`;
+  if (ct.includes("spreadsheetml") || ct.includes("excel")) return `${basename}.xlsx`;
+  if (ct.includes("png")) return `${basename}.png`;
+  if (ct.includes("jpeg") || ct.includes("jpg")) return `${basename}.jpg`;
+  if (ct.startsWith("text/")) return `${basename}.txt`;
+  return `${basename}.pdf`;
 }
 
 async function streamPipeline(
@@ -85,8 +104,8 @@ app.post("/upload-url", async (req, res) => {
   if (!url) { res.status(400).json({ error: "No URL provided" }); return; }
 
   const parsedUrl = new URL(url);
-  const filename = path.basename(parsedUrl.pathname) || "document.pdf";
-  const tempPath = path.join(UPLOAD_DIR, `${Date.now()}-${filename}`);
+  let filename = path.basename(parsedUrl.pathname) || "download";
+  const tempPath = path.join(UPLOAD_DIR, `${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`);
 
   try {
     const response = await fetch(url);
@@ -94,6 +113,7 @@ app.post("/upload-url", async (req, res) => {
       res.status(400).json({ error: `Failed to download: HTTP ${response.status}` });
       return;
     }
+    filename = filenameWithExtFromContentType(filename, response.headers.get("content-type"));
     const body = Buffer.from(await response.arrayBuffer());
     if (body.length > MAX_UPLOAD_BYTES) {
       res.status(400).json({

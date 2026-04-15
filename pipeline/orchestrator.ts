@@ -19,7 +19,7 @@ import fs from "fs";
 const WORKFLOW_SLUG = process.env.WORKFLOW_SLUG || "render-workflows-llamaindex-workflow";
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || "3000", 10);
 const MAX_UPLOAD_BYTES = parseInt(
-  process.env.MAX_UPLOAD_BYTES || String(15 * 1024 * 1024),
+  process.env.MAX_UPLOAD_BYTES || String(100 * 1024 * 1024),
   10
 );
 
@@ -64,7 +64,7 @@ export async function* runPipeline(
     const buf = fs.readFileSync(filePath);
     if (buf.length > MAX_UPLOAD_BYTES) {
       throw new Error(
-        `File too large (max ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB for this demo)`
+        `File too large (max ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB; set MAX_UPLOAD_BYTES if needed)`
       );
     }
     const fileBase64 = buf.toString("base64");
@@ -148,6 +148,7 @@ export async function* runPipeline(
       classification,
       parsed,
       extracted,
+      filename,
     ])) as { indexed: boolean };
 
     const elapsed = Math.round((Date.now() - t0) / 1000);
