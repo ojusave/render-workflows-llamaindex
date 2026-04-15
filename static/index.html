@@ -189,6 +189,14 @@
       font-family: 'SF Mono', 'Fira Code', monospace;
     }
 
+    .dashboard-link {
+      display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; font-weight: 500;
+      color: var(--render-purple); padding: 0.3rem 0.6rem; border: 1px solid rgba(108,99,255,0.25);
+      background: rgba(108,99,255,0.06); transition: all 0.15s; margin-top: 0.75rem; text-decoration: none;
+    }
+    .dashboard-link:hover { background: rgba(108,99,255,0.12); border-color: rgba(108,99,255,0.4); text-decoration: none; }
+    .activity-error { color: var(--red); font-size: 0.8rem; margin-top: 0.75rem; }
+
     .stats-row {
       display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;
     }
@@ -284,8 +292,16 @@
         </div>
 
         <div id="pipeline-view">
-          <div id="pipeline-filename" style="font-size:1.1rem;font-weight:500;color:var(--text-strong);margin-bottom:1rem;"></div>
+          <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+            <div id="pipeline-filename" style="font-size:1.1rem;font-weight:500;color:var(--text-strong)"></div>
+            <span id="pipeline-timer" style="font-size:0.7rem;color:var(--text-dim);font-variant-numeric:tabular-nums;margin-left:auto">0:00</span>
+          </div>
           <div class="activity-feed" id="activity-feed"></div>
+          <a href="https://dashboard.render.com/" target="_blank" class="dashboard-link" id="dashboard-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Watch tasks in the Render Dashboard
+          </a>
+          <div id="pipeline-error" class="activity-error"></div>
           <div id="result-section"></div>
         </div>
 
@@ -364,19 +380,48 @@
       fileInput.value = '';
     });
 
+    // Timer
+    let timerInterval = null;
+    let timerStart = 0;
+    const timerEl = document.getElementById('pipeline-timer');
+
+    function startTimer() {
+      timerStart = Date.now();
+      timerEl.textContent = '0:00';
+      timerInterval = setInterval(() => {
+        const sec = Math.floor((Date.now() - timerStart) / 1000);
+        timerEl.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+      }, 1000);
+    }
+    function stopTimer() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+
+    // Per-step timing
+    let stepStart = 0;
+    function stepElapsed() {
+      const sec = Math.round((Date.now() - stepStart) / 1000);
+      stepStart = Date.now();
+      return sec;
+    }
+
     // Upload and stream pipeline
     async function uploadFile(file) {
       showView('pipeline');
       document.getElementById('pipeline-filename').textContent = file.name;
       const feed = document.getElementById('activity-feed');
       const resultSection = document.getElementById('result-section');
+      const errorEl = document.getElementById('pipeline-error');
       feed.innerHTML = '';
       resultSection.innerHTML = '';
+      errorEl.textContent = '';
+      startTimer();
+      stepStart = Date.now();
 
       const formData = new FormData();
       formData.append('file', file);
 
-      addActivity(feed, 'Uploading ' + file.name + '...', 'active');
+      addActivity(feed, 'Uploading <strong>' + escapeHtml(file.name) + '</strong> to <strong>LlamaCloud</strong>...', 'active');
 
       try {
         const response = await fetch('/upload', { method: 'POST', body: formData });
@@ -398,20 +443,21 @@
               eventType = line.slice(7).trim();
             } else if (line.startsWith('data: ') && eventType) {
               const data = JSON.parse(line.slice(6));
-              handleEvent(feed, resultSection, eventType, data);
+              handleEvent(feed, resultSection, errorEl, eventType, data);
               eventType = null;
             }
           }
         }
       } catch (err) {
-        addActivity(feed, 'Connection error: ' + err.message, 'error');
+        stopTimer();
+        addActivity(feed, 'Connection error: ' + escapeHtml(err.message), 'error');
+        errorEl.textContent = err.message;
       }
 
       loadDocuments();
     }
 
     function addActivity(feed, text, state) {
-      // Mark previous active items as done
       if (state === 'active') {
         feed.querySelectorAll('.activity-item.active').forEach(el => {
           el.classList.remove('active');
@@ -426,51 +472,71 @@
       return item;
     }
 
-    function handleEvent(feed, resultSection, event, data) {
-      switch (event) {
-        case 'status':
-          const phaseLabels = {
-            uploading: 'Uploading file to LlamaCloud...',
-            classifying: '<strong>Classifying</strong> document type via LlamaCloud Classify',
-            parsing: '<strong>Parsing</strong> document content via LlamaParse (agentic tier)',
-            extracting: '<strong>Extracting</strong> structured fields via LlamaExtract for <em>' + (data.docType || 'document') + '</em>',
-            storing: '<strong>Storing</strong> results in Render Postgres with pgvector embeddings',
-          };
-          addActivity(feed, phaseLabels[data.phase] || data.phase, 'active');
-          break;
+    function addElapsedToLast(feed) {
+      const sec = stepElapsed();
+      const items = feed.querySelectorAll('.activity-item.done');
+      const last = items[items.length - 1];
+      if (last && sec > 0) {
+        const span = document.createElement('span');
+        span.style.cssText = 'font-size:0.7rem;color:var(--text-dim);font-variant-numeric:tabular-nums;flex-shrink:0;margin-top:0.15rem';
+        span.textContent = sec + 's';
+        last.appendChild(span);
+      }
+    }
 
+    function handleEvent(feed, resultSection, errorEl, event, data) {
+      switch (event) {
+        case 'status': {
+          const labels = {
+            uploading: '<strong>Render Workflows</strong> is uploading your file to <strong>LlamaCloud</strong>...',
+            classifying: '<strong>Render Workflows</strong> dispatched classify task: <strong>LlamaCloud Classify</strong> is analyzing your document...',
+            parsing: '<strong>Render Workflows</strong> dispatched parse task: <strong>LlamaParse</strong> (agentic tier) is extracting content...',
+            extracting: '<strong>Render Workflows</strong> dispatched extract task: <strong>LlamaExtract</strong> is pulling structured fields for <em>' + escapeHtml(data.docType || 'document') + '</em>...',
+            storing: '<strong>Render Workflows</strong> dispatched store task: writing to <strong>Render Postgres</strong> with <strong>pgvector</strong> embeddings...',
+          };
+          addActivity(feed, labels[data.phase] || data.phase, 'active');
+          break;
+        }
         case 'uploaded':
-          addActivity(feed, 'File uploaded to LlamaCloud (ID: <code>' + data.fileId?.slice(0, 12) + '...</code>)', 'done');
+          addElapsedToLast(feed);
+          addActivity(feed, '<strong>LlamaCloud</strong> received the file (ID: <code>' + (data.fileId || '').slice(0, 12) + '...</code>)', 'done');
           break;
 
         case 'classified':
-          addActivity(feed, 'Classified as <strong>' + data.docType + '</strong> (confidence: ' + (data.confidence * 100).toFixed(0) + '%)', 'done');
+          addElapsedToLast(feed);
+          addActivity(feed, '<strong>LlamaCloud Classify</strong> identified this as <strong>' + escapeHtml(data.docType) + '</strong> (' + (data.confidence * 100).toFixed(0) + '% confidence)', 'done');
           break;
 
         case 'parsed':
-          addActivity(feed, 'Parsed <strong>' + data.pageCount + ' page(s)</strong> to markdown', 'done');
+          addElapsedToLast(feed);
+          addActivity(feed, '<strong>LlamaParse</strong> extracted <strong>' + data.pageCount + ' page(s)</strong> of clean markdown', 'done');
           break;
 
         case 'extracted':
-          addActivity(feed, 'Extracted <strong>' + data.fields.length + ' fields</strong>: ' + data.fields.join(', '), 'done');
+          addElapsedToLast(feed);
+          addActivity(feed, '<strong>LlamaExtract</strong> pulled <strong>' + data.fields.length + ' fields</strong>: ' + data.fields.map(escapeHtml).join(', '), 'done');
           renderExtractedData(resultSection, data.data);
           break;
 
         case 'done':
+          addElapsedToLast(feed);
+          stopTimer();
           feed.querySelectorAll('.activity-item.active').forEach(el => {
             el.classList.remove('active');
             el.classList.add('done');
           });
-          addActivity(feed, 'Pipeline complete in <strong>' + data.elapsed + 's</strong>. ' + data.chunksStored + ' chunks indexed.', 'done');
+          addActivity(feed, 'Pipeline complete in <strong>' + data.elapsed + 's</strong>: ' + data.chunksStored + ' chunks indexed in <strong>pgvector</strong>', 'done');
           renderSummary(resultSection, data);
           break;
 
         case 'error':
+          stopTimer();
           feed.querySelectorAll('.activity-item.active').forEach(el => {
             el.classList.remove('active');
             el.classList.add('error');
           });
-          addActivity(feed, 'Error: ' + data.message, 'error');
+          addActivity(feed, 'Error: ' + escapeHtml(data.message), 'error');
+          errorEl.textContent = data.message;
           break;
       }
     }
