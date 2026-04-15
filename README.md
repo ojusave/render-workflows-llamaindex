@@ -76,8 +76,9 @@ tasks/
   extract.ts                 LlamaExtract with auto-schema
   schemas.ts                 JSON Schemas per document type
   store.ts                   Postgres writes + LlamaCloud pipeline indexing
-  llama-client.ts            Shared LlamaCloud client
-shared/db.ts                 Postgres pool, schema init, queries
+shared/
+  db.ts                      Postgres pool, schema init, queries
+  llama-client.ts            Shared LlamaCloud client singleton
 static/index.html            Frontend UI
 render.yaml                  Render Blueprint
 ```

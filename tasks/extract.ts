@@ -5,7 +5,7 @@
  */
 
 import { task } from "@renderinc/sdk/workflows";
-import { getLlamaClient } from "./llama-client.js";
+import { getLlamaClient } from "../shared/llama-client.js";
 import { SCHEMAS, type DataSchema } from "./schemas.js";
 export const extractFields = task(
   {

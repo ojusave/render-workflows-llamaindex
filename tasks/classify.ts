@@ -4,7 +4,7 @@
  */
 
 import { task } from "@renderinc/sdk/workflows";
-import { getLlamaClient } from "./llama-client.js";
+import { getLlamaClient } from "../shared/llama-client.js";
 
 const CLASSIFICATION_RULES = [
   { type: "invoice", description: "Contains invoice number, vendor/seller info, line items, total amount due, and payment terms" },

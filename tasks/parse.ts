@@ -4,7 +4,7 @@
  */
 
 import { task } from "@renderinc/sdk/workflows";
-import { getLlamaClient } from "./llama-client.js";
+import { getLlamaClient } from "../shared/llama-client.js";
 export const parseDocument = task(
   {
     name: "parse_document",

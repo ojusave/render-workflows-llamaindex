@@ -10,7 +10,7 @@ import {
   updateDocumentExtracted,
   updateDocumentFileId,
 } from "../shared/db.js";
-import { getLlamaClient } from "./llama-client.js";
+import { getLlamaClient } from "../shared/llama-client.js";
 
 const PIPELINE_ID = process.env.LLAMACLOUD_PIPELINE_ID;
 

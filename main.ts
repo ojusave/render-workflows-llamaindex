@@ -10,7 +10,6 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import LlamaCloud from "@llamaindex/llama-cloud";
 
 import {
   initDb,
@@ -20,6 +19,7 @@ import {
   deleteDocument,
   updateDocumentError,
 } from "./shared/db.js";
+import { getLlamaClient } from "./shared/llama-client.js";
 import { runPipeline } from "./pipeline/orchestrator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -33,10 +33,6 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-
-function getLlamaClient(): LlamaCloud {
-  return new LlamaCloud({ apiKey: process.env.LLAMA_CLOUD_API_KEY! });
-}
 
 function sseHeaders(res: express.Response) {
   res.writeHead(200, {
@@ -59,7 +55,6 @@ async function streamPipeline(
   try {
     for await (const event of runPipeline(documentId, tempPath, filename)) {
       res.write(event);
-      if (typeof (res as any).flush === "function") (res as any).flush();
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -67,6 +62,22 @@ async function streamPipeline(
     res.write(`event: error\ndata: ${JSON.stringify({ message, documentId })}\n\n`);
   }
   res.end();
+}
+
+async function retrieveFromPipeline(query: string, topK: number, rerankN: number) {
+  const client = getLlamaClient();
+  const result = await client.pipelines.retrieve(PIPELINE_ID!, {
+    query,
+    retrieval_mode: "chunks",
+    dense_similarity_top_k: topK,
+    enable_reranking: true,
+    rerank_top_n: rerankN,
+  });
+  return result.retrieval_nodes.map((node) => ({
+    text: node.node.text ?? "",
+    score: node.score,
+    metadata: (node.node as Record<string, unknown>).metadata ?? {},
+  }));
 }
 
 app.get("/health", (_req, res) => {
@@ -130,28 +141,10 @@ app.delete("/documents/:id", async (req, res) => {
 app.post("/search", async (req, res) => {
   const { query } = req.body;
   if (!query) { res.status(400).json({ error: "Query is required" }); return; }
-
-  if (!PIPELINE_ID) {
-    res.status(503).json({ error: "Search not configured: set LLAMACLOUD_PIPELINE_ID" });
-    return;
-  }
+  if (!PIPELINE_ID) { res.status(503).json({ error: "Search not configured: set LLAMACLOUD_PIPELINE_ID" }); return; }
 
   try {
-    const client = getLlamaClient();
-    const result = await client.pipelines.retrieve(PIPELINE_ID, {
-      query,
-      retrieval_mode: "chunks",
-      dense_similarity_top_k: 10,
-      enable_reranking: true,
-      rerank_top_n: 5,
-    });
-
-    const results = result.retrieval_nodes.map((node) => ({
-      text: node.node.text ?? "",
-      score: node.score,
-      metadata: (node.node as any).metadata ?? {},
-    }));
-
+    const results = await retrieveFromPipeline(query, 10, 5);
     res.json(results);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -162,40 +155,16 @@ app.post("/search", async (req, res) => {
 app.post("/ask", async (req, res) => {
   const { question } = req.body;
   if (!question) { res.status(400).json({ error: "Question is required" }); return; }
-
-  if (!PIPELINE_ID) {
-    res.status(503).json({ error: "RAG not configured: set LLAMACLOUD_PIPELINE_ID" });
-    return;
-  }
+  if (!PIPELINE_ID) { res.status(503).json({ error: "RAG not configured: set LLAMACLOUD_PIPELINE_ID" }); return; }
 
   try {
-    const client = getLlamaClient();
+    const sources = await retrieveFromPipeline(question, 8, 4);
+    const context = sources.map((s, i) => `[${i + 1}] ${s.text}`).join("\n\n");
 
-    const retrieval = await client.pipelines.retrieve(PIPELINE_ID, {
-      query: question,
-      retrieval_mode: "chunks",
-      dense_similarity_top_k: 8,
-      enable_reranking: true,
-      rerank_top_n: 4,
-    });
-
-    const context = retrieval.retrieval_nodes
-      .map((node, i) => `[${i + 1}] ${node.node.text ?? ""}`)
-      .join("\n\n");
-
-    const sources = retrieval.retrieval_nodes.map((node) => ({
-      text: (node.node.text ?? "").slice(0, 200),
-      score: node.score,
-      metadata: (node.node as any).metadata ?? {},
-    }));
-
-    // Use LlamaCloud's chat completion or fall back to returning context for the frontend
-    // For now, return the retrieved context and sources so the frontend can display them
-    // A production version would call an LLM here for synthesis
     res.json({
       question,
       context,
-      sources,
+      sources: sources.map((s) => ({ ...s, text: s.text.slice(0, 200) })),
       answer: sources.length > 0
         ? `Based on ${sources.length} relevant passages from your documents:\n\n${context}`
         : "No relevant documents found. Upload some documents first.",

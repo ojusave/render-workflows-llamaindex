@@ -9,7 +9,7 @@
  *   - classify_document: LlamaCloud Classify API
  *   - parse_document: LlamaParse agentic tier
  *   - extract_fields: LlamaExtract with auto-schema
- *   - store_results: persist to Postgres + generate embeddings
+ *   - store_results: persist to Postgres + index in LlamaCloud pipeline
  */
 
 import "./classify.js";
