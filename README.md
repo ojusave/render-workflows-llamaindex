@@ -29,76 +29,11 @@ The web service dispatches these tasks via the [Render SDK](https://render.com/d
 
 ### Architecture
 
-```mermaid
-graph LR
-    Browser["Browser"]
-    
-    subgraph render ["Render"]
-        WebService["Express Web Service"]
-        Workflows["Render Workflows"]
-        Postgres[("Postgres + pgvector")]
-    end
-    
-    subgraph llama ["LlamaCloud"]
-        Classify["Classify API"]
-        Parse["LlamaParse"]
-        Extract["LlamaExtract"]
-    end
-    
-    Browser -->|"upload file"| WebService
-    WebService -->|"SSE progress"| Browser
-    WebService -->|"startTask via SDK"| Workflows
-    Workflows --> Classify
-    Workflows --> Parse
-    Workflows --> Extract
-    Workflows -->|"store results"| Postgres
-    WebService -->|"query docs"| Postgres
-    Browser -->|"browse + search"| WebService
-```
+![Architecture diagram](static/images/architecture-diagram.png)
 
-### Pipeline sequence
+### Pipeline flow
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant Web as Express Web Service
-    participant WF as Render Workflows
-    participant LC as LlamaCloud
-    participant DB as Postgres + pgvector
-
-    User->>Web: POST /upload (file)
-    Web->>DB: INSERT document (status: processing)
-    Web->>LC: Upload file
-    LC-->>Web: file_id
-
-    Web->>WF: startTask(classify_document)
-    WF->>LC: Classify API
-    LC-->>WF: type, confidence, reasoning
-    WF-->>Web: classification result
-    Web-->>User: SSE: classified as "contract" (95%)
-
-    Web->>WF: startTask(parse_document)
-    WF->>LC: LlamaParse (agentic)
-    LC-->>WF: markdown, text, pages
-    WF-->>Web: parsed result
-    Web-->>User: SSE: parsed 3 pages
-
-    Web->>WF: startTask(extract_fields)
-    WF->>LC: LlamaExtract + schema
-    LC-->>WF: structured JSON
-    WF-->>Web: extracted result
-    Web-->>User: SSE: extracted 6 fields
-
-    Web->>WF: startTask(store_results)
-    WF->>DB: write metadata, markdown, chunks + embeddings
-    WF-->>Web: chunks stored
-    Web-->>User: SSE: pipeline complete
-
-    User->>Web: GET /documents
-    Web->>DB: SELECT
-    DB-->>Web: document list
-    Web-->>User: browse + search results
-```
+![Pipeline flow](static/images/pipeline-flow.png)
 
 **Tech stack**: [Express](https://expressjs.com) on Node.js with [multer](https://www.npmjs.com/package/multer) for file uploads, [@llamaindex/llama-cloud](https://www.npmjs.com/package/@llamaindex/llama-cloud) TypeScript SDK, [@renderinc/sdk](https://www.npmjs.com/package/@renderinc/sdk) for Workflows, [pg](https://www.npmjs.com/package/pg) for Postgres. SSE streaming uses native `res.write()` for real-time progress.
 
