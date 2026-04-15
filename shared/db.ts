@@ -36,6 +36,10 @@ export async function initDb(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_documents_status
       ON documents (status)
     `);
+    // Existing DBs from before this column existed: CREATE TABLE IF NOT EXISTS does not add columns.
+    await client.query(`
+      ALTER TABLE documents ADD COLUMN IF NOT EXISTS llamacloud_file_id TEXT
+    `);
   } finally {
     client.release();
   }

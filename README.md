@@ -8,7 +8,7 @@ Upload any document. The pipeline classifies it, parses it to clean markdown, ex
 
 ![Architecture diagram](static/images/architecture-diagram.png)
 
-The web service accepts file uploads (or URLs) and dispatches four [Render Workflow tasks](https://render.com/docs/workflows-defining), each with its own compute, retries, and timeout. Progress streams back to the browser via SSE as each stage completes. Processed documents are indexed in a [LlamaCloud managed pipeline](https://developers.llamaindex.ai/cloud-api-reference/llama-platform/) for semantic search with real embeddings, hybrid retrieval, and reranking.
+The web service accepts file uploads (or URLs), reads bytes from disk, and dispatches five [Render Workflow tasks](https://render.com/docs/workflows-defining): upload to LlamaCloud, then classify, parse, extract, and store. Each stage has its own compute plan, retries, and timeout. Progress streams back to the browser via SSE as each stage completes. Processed documents are indexed in a [LlamaCloud managed pipeline](https://developers.llamaindex.ai/cloud-api-reference/llama-platform/) for semantic search with real embeddings, hybrid retrieval, and reranking.
 
 ![Pipeline flow](static/images/pipeline-flow.png)
 
@@ -51,6 +51,7 @@ Create a pipeline in the [LlamaCloud UI](https://cloud.llamaindex.ai) (Index > C
 | `DATABASE_URL` | Both | (required) | Postgres [Internal URL](https://render.com/docs/databases#connecting-from-within-render). Auto-injected on web service via Blueprint. |
 | `LLAMACLOUD_PIPELINE_ID` | Both | (optional) | [LlamaCloud pipeline](https://cloud.llamaindex.ai) ID for semantic search and RAG |
 | `WORKFLOW_SLUG` | Web service | `render-workflows-llamaindex-workflow` | Must match the workflow service name |
+| `MAX_UPLOAD_BYTES` | Web service | `15728640` (15 MB) | Max file size for multipart and URL downloads (must match workflow payload limits) |
 | `PORT` | Web service | `3000` | [Set automatically by Render](https://render.com/docs/environment-variables#all-runtimes) |
 
 ## Local development
@@ -71,6 +72,7 @@ main.ts                      Express web server: upload, search, ask, documents
 pipeline/orchestrator.ts     Dispatch tasks, poll, stream SSE
 tasks/
   index.ts                   Workflow entry point
+  upload.ts                  LlamaCloud Files API (register upload)
   classify.ts                LlamaCloud Classify API
   parse.ts                   LlamaParse agentic tier
   extract.ts                 LlamaExtract with auto-schema
@@ -79,6 +81,7 @@ tasks/
 shared/
   db.ts                      Postgres pool, schema init, queries
   llama-client.ts            Shared LlamaCloud client singleton
+  pipeline-retrieval.ts      Search/Ask: MANAGED vs PLAYGROUND retrieval APIs
 static/index.html            Frontend UI
 render.yaml                  Render Blueprint
 ```
@@ -100,5 +103,7 @@ render.yaml                  Render Blueprint
 **Database connection errors**: use the [Internal URL](https://render.com/docs/databases#connecting-from-within-render), not the External URL.
 
 **Search returns "not configured"**: set `LLAMACLOUD_PIPELINE_ID` on both web service and workflow service.
+
+**Search / Ask and pipeline types**: LlamaCloud distinguishes **MANAGED** and **PLAYGROUND** pipelines. The UI often creates **PLAYGROUND** pipelines. The app uses `pipelines.retrieve` for MANAGED and `retrievers.search` for PLAYGROUND so both work with the same `LLAMACLOUD_PIPELINE_ID`.
 
 **LlamaCloud rate limits**: tasks retry automatically (2 retries with exponential backoff). Check your [usage dashboard](https://cloud.llamaindex.ai).

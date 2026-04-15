@@ -531,7 +531,7 @@
       const formData = new FormData();
       formData.append('file', file);
 
-      addActivity(feed, 'Uploading <strong>' + escapeHtml(file.name) + '</strong> to <strong>LlamaCloud</strong>...', 'active');
+      addActivity(feed, 'Sending <strong>' + escapeHtml(file.name) + '</strong> to <strong>Render Workflows</strong> (upload task → LlamaCloud)...', 'active');
 
       function parseSSEBuffer() {
         const parts = sseBuffer.split('\n\n');
@@ -561,6 +561,7 @@
 
         if (!response.ok) {
           addActivity(feed, 'Upload failed: HTTP ' + response.status, 'error');
+          pipelineRunning = false;
           stopTimer();
           loadDocuments();
           return;
@@ -620,11 +621,11 @@
       switch (event) {
         case 'status': {
           const labels = {
-            uploading: '<strong>Render Workflows</strong> is uploading your file to <strong>LlamaCloud</strong>...',
+            uploading: '<strong>Render Workflows</strong> dispatched upload task: <strong>LlamaCloud Files</strong> is registering your document...',
             classifying: '<strong>Render Workflows</strong> dispatched classify task: <strong>LlamaCloud Classify</strong> is analyzing your document...',
             parsing: '<strong>Render Workflows</strong> dispatched parse task: <strong>LlamaParse</strong> (agentic tier) is extracting content...',
             extracting: '<strong>Render Workflows</strong> dispatched extract task: <strong>LlamaExtract</strong> is pulling structured fields for <em>' + escapeHtml(data.docType || 'document') + '</em>...',
-            storing: '<strong>Render Workflows</strong> dispatched store task: writing to <strong>Render Postgres</strong> with <strong>pgvector</strong> embeddings...',
+            storing: '<strong>Render Workflows</strong> dispatched store task: <strong>Render Postgres</strong> + <strong>LlamaCloud</strong> pipeline index...',
           };
           addActivity(feed, labels[data.phase] || data.phase, 'active');
           break;

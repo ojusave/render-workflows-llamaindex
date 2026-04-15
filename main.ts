@@ -19,7 +19,7 @@ import {
   deleteDocument,
   updateDocumentError,
 } from "./shared/db.js";
-import { getLlamaClient } from "./shared/llama-client.js";
+import { retrieveFromConfiguredPipeline } from "./shared/pipeline-retrieval.js";
 import { runPipeline } from "./pipeline/orchestrator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -28,7 +28,11 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const PIPELINE_ID = process.env.LLAMACLOUD_PIPELINE_ID;
 
-const upload = multer({ dest: UPLOAD_DIR });
+const MAX_UPLOAD_BYTES = parseInt(
+  process.env.MAX_UPLOAD_BYTES || String(15 * 1024 * 1024),
+  10
+);
+const upload = multer({ dest: UPLOAD_DIR, limits: { fileSize: MAX_UPLOAD_BYTES } });
 const app = express();
 
 app.use(cors());
@@ -64,22 +68,6 @@ async function streamPipeline(
   res.end();
 }
 
-async function retrieveFromPipeline(query: string, topK: number, rerankN: number) {
-  const client = getLlamaClient();
-  const result = await client.pipelines.retrieve(PIPELINE_ID!, {
-    query,
-    retrieval_mode: "chunks",
-    dense_similarity_top_k: topK,
-    enable_reranking: true,
-    rerank_top_n: rerankN,
-  });
-  return result.retrieval_nodes.map((node) => ({
-    text: node.node.text ?? "",
-    score: node.score,
-    metadata: (node.node as Record<string, unknown>).metadata ?? {},
-  }));
-}
-
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
@@ -106,7 +94,14 @@ app.post("/upload-url", async (req, res) => {
       res.status(400).json({ error: `Failed to download: HTTP ${response.status}` });
       return;
     }
-    fs.writeFileSync(tempPath, Buffer.from(await response.arrayBuffer()));
+    const body = Buffer.from(await response.arrayBuffer());
+    if (body.length > MAX_UPLOAD_BYTES) {
+      res.status(400).json({
+        error: `Downloaded file too large (max ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB)`,
+      });
+      return;
+    }
+    fs.writeFileSync(tempPath, body);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(400).json({ error: `Failed to download: ${message}` });
@@ -144,7 +139,7 @@ app.post("/search", async (req, res) => {
   if (!PIPELINE_ID) { res.status(503).json({ error: "Search not configured: set LLAMACLOUD_PIPELINE_ID" }); return; }
 
   try {
-    const results = await retrieveFromPipeline(query, 10, 5);
+    const results = await retrieveFromConfiguredPipeline(PIPELINE_ID!, query, 10, 5);
     res.json(results);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -158,7 +153,7 @@ app.post("/ask", async (req, res) => {
   if (!PIPELINE_ID) { res.status(503).json({ error: "RAG not configured: set LLAMACLOUD_PIPELINE_ID" }); return; }
 
   try {
-    const sources = await retrieveFromPipeline(question, 8, 4);
+    const sources = await retrieveFromConfiguredPipeline(PIPELINE_ID!, question, 8, 4);
     const context = sources.map((s, i) => `[${i + 1}] ${s.text}`).join("\n\n");
 
     res.json({

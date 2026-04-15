@@ -2,23 +2,26 @@
  * Pipeline orchestrator: dispatches workflow tasks via the Render SDK,
  * polls for completion, and yields SSE events for real-time progress.
  *
- * Flow:
- *   1. Upload file to LlamaCloud → get file_id
+ * Flow (all LlamaCloud work runs on the workflow service except reading the
+ * temp upload on this host to send bytes to the first task):
+ *   1. upload_to_llamacloud → LlamaCloud file_id
  *   2. classify_document → doc type + confidence
  *   3. parse_document → markdown + text
  *   4. extract_fields → structured JSON
- *   5. store_results → persist to Postgres
+ *   5. store_results → persist to Postgres + index in LlamaCloud pipeline
  *
  * The web service streams these events to the frontend as SSE.
  */
 
 import { Render } from "@renderinc/sdk";
-import LlamaCloud from "@llamaindex/llama-cloud";
 import fs from "fs";
-import path from "path";
 
 const WORKFLOW_SLUG = process.env.WORKFLOW_SLUG || "render-workflows-llamaindex-workflow";
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || "3000", 10);
+const MAX_UPLOAD_BYTES = parseInt(
+  process.env.MAX_UPLOAD_BYTES || String(15 * 1024 * 1024),
+  10
+);
 
 const render = new Render();
 
@@ -58,25 +61,22 @@ export async function* runPipeline(
   const t0 = Date.now();
 
   try {
-    // Step 0: Upload file to LlamaCloud
+    const buf = fs.readFileSync(filePath);
+    if (buf.length > MAX_UPLOAD_BYTES) {
+      throw new Error(
+        `File too large (max ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB for this demo)`
+      );
+    }
+    const fileBase64 = buf.toString("base64");
+
+    // Step 0: Workflow task uploads bytes to LlamaCloud (web only read FS + dispatch)
     yield sse("status", { phase: "uploading", documentId, filename });
 
-    const client = new LlamaCloud({
-      apiKey: process.env.LLAMA_CLOUD_API_KEY!,
-    });
-
-    // Rename temp file to include original extension so LlamaCloud detects the type
-    const ext = path.extname(filename);
-    const namedPath = filePath + ext;
-    fs.renameSync(filePath, namedPath);
-    filePath = namedPath;
-
-    const fileStream = fs.createReadStream(filePath);
-    const uploadedFile = await client.files.create({
-      file: fileStream,
-      purpose: "extract",
-    });
-    const fileId = uploadedFile.id;
+    const uploadResult = (await startAndWait("upload_to_llamacloud", [
+      fileBase64,
+      filename,
+    ])) as { fileId: string };
+    const fileId = uploadResult.fileId;
 
     yield sse("uploaded", { fileId, filename });
 
