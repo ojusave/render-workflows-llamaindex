@@ -353,10 +353,10 @@
 
     function showView(view) {
       currentView = view;
-      document.getElementById('welcome').style.display = view === 'welcome' ? '' : 'none';
-      document.getElementById('pipeline-view').style.display = view === 'pipeline' ? '' : 'none';
-      document.getElementById('detail-view').style.display = view === 'detail' ? '' : 'none';
-      document.getElementById('search-view').style.display = view === 'search' ? '' : 'none';
+      document.getElementById('welcome').style.display = view === 'welcome' ? 'block' : 'none';
+      document.getElementById('pipeline-view').style.display = view === 'pipeline' ? 'block' : 'none';
+      document.getElementById('detail-view').style.display = view === 'detail' ? 'block' : 'none';
+      document.getElementById('search-view').style.display = view === 'search' ? 'block' : 'none';
     }
 
     function showUpload() { showView('welcome'); }
