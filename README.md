@@ -38,7 +38,7 @@ Browser ──upload──▶ Web Service ──trigger──▶ Render Workflow
                     Serve UI ◀─── query ◀── Render Postgres (pgvector)
 ```
 
-**Tech stack**: [Hono](https://hono.dev) on Node.js, [@llamaindex/llama-cloud](https://www.npmjs.com/package/@llamaindex/llama-cloud) TypeScript SDK, [@renderinc/sdk](https://www.npmjs.com/package/@renderinc/sdk) for Workflows, [pg](https://www.npmjs.com/package/pg) for Postgres.
+**Tech stack**: [Express](https://expressjs.com) on Node.js, [@llamaindex/llama-cloud](https://www.npmjs.com/package/@llamaindex/llama-cloud) TypeScript SDK, [@renderinc/sdk](https://www.npmjs.com/package/@renderinc/sdk) for Workflows, [pg](https://www.npmjs.com/package/pg) for Postgres.
 
 ## Prerequisites
 
@@ -53,7 +53,7 @@ Browser ──upload──▶ Web Service ──trigger──▶ Render Workflow
 
 Click the Deploy to Render button above, or create a [Blueprint](https://render.com/docs/infrastructure-as-code) from this repo. The [`render.yaml`](render.yaml) defines:
 
-- A **web service** (`render-workflows-llamaindex`) running the Hono server
+- A **web service** (`render-workflows-llamaindex`) running the Express server
 - A **Postgres database** (`llamaindex-docs-db`) with automatic connection string injection via [`fromDatabase`](https://render.com/docs/infrastructure-as-code#referencing-values-from-other-components)
 
 You will be prompted for `RENDER_API_KEY` and `LLAMA_CLOUD_API_KEY` during deploy.
@@ -106,7 +106,7 @@ Local dev requires a running Postgres with pgvector and a deployed workflow serv
 ## Project structure
 
 ```
-main.ts                      Hono web server: upload, documents, search, health
+main.ts                      Express web server: upload, documents, search, health
 pipeline/
   orchestrator.ts            Dispatch workflow tasks, poll, stream SSE
 tasks/

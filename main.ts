@@ -1,21 +1,12 @@
 /**
- * Hono web server: the HTTP layer for the document intelligence pipeline.
- *
- * Endpoints:
- *   POST /upload        - upload a document, returns SSE progress stream
- *   GET  /documents     - list all processed documents
- *   GET  /documents/:id - get a single document with all data
- *   DELETE /documents/:id - delete a document
- *   POST /search        - semantic search across documents
- *   GET  /health        - health check for Render
- *   GET  /              - serve the frontend
+ * Express web server for the document intelligence pipeline.
+ * SSE streaming uses native res.write() which flushes immediately.
+ * File uploads handled by multer, stored in .uploads/ during processing.
  */
 
-import { Hono } from "hono";
-import { cors } from "hono/cors";
-import { serveStatic } from "@hono/node-server/serve-static";
-import { serve } from "@hono/node-server";
-import { streamSSE } from "hono/streaming";
+import express from "express";
+import cors from "cors";
+import multer from "multer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -34,92 +25,95 @@ import { runPipeline } from "./pipeline/orchestrator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, ".uploads");
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-const app = new Hono();
+const upload = multer({ dest: UPLOAD_DIR });
+const app = express();
 
-app.use("*", cors());
+app.use(cors());
+app.use(express.json());
 
-app.get("/health", (c) => c.json({ status: "ok" }));
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
 
-app.post("/upload", async (c) => {
-  const body = await c.req.parseBody();
-  const file = body["file"];
-
-  if (!file || typeof file === "string") {
-    return c.json({ error: "No file provided" }, 400);
+app.post("/upload", upload.single("file"), async (req, res) => {
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: "No file provided" });
+    return;
   }
 
-  const filename = file.name || "document";
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-  const tempPath = path.join(UPLOAD_DIR, `${Date.now()}-${filename}`);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  fs.writeFileSync(tempPath, buffer);
+  const filename = file.originalname || "document";
+  const tempPath = file.path;
 
   const documentId = await insertDocument(filename);
 
-  return streamSSE(c, async (stream) => {
-    try {
-      for await (const raw of runPipeline(documentId, tempPath, filename)) {
-        const eventMatch = raw.match(/^event: (.+)\ndata: (.+)\n\n$/s);
-        if (eventMatch) {
-          await stream.writeSSE({ event: eventMatch[1], data: eventMatch[2] });
-        }
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      await updateDocumentError(documentId, message);
-      await stream.writeSSE({
-        event: "error",
-        data: JSON.stringify({ message, documentId }),
-      });
-    }
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
   });
+
+  try {
+    for await (const event of runPipeline(documentId, tempPath, filename)) {
+      res.write(event);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await updateDocumentError(documentId, message);
+    res.write(`event: error\ndata: ${JSON.stringify({ message, documentId })}\n\n`);
+  }
+
+  res.end();
 });
 
-app.get("/documents", async (c) => {
+app.get("/documents", async (_req, res) => {
   const docs = await listDocuments();
-  return c.json(docs);
+  res.json(docs);
 });
 
-app.get("/documents/:id", async (c) => {
-  const id = parseInt(c.req.param("id"), 10);
-  if (isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
+app.get("/documents/:id", async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
 
   const doc = await getDocument(id);
-  if (!doc) return c.json({ error: "Not found" }, 404);
-  return c.json(doc);
+  if (!doc) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(doc);
 });
 
-app.delete("/documents/:id", async (c) => {
-  const id = parseInt(c.req.param("id"), 10);
-  if (isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
+app.delete("/documents/:id", async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
 
   const deleted = await deleteDocument(id);
-  if (!deleted) return c.json({ error: "Not found" }, 404);
-  return c.json({ status: "ok" });
+  if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
+  res.json({ status: "ok" });
 });
 
-app.post("/search", async (c) => {
-  const { query } = await c.req.json<{ query: string }>();
-  if (!query) return c.json({ error: "Query is required" }, 400);
+app.post("/search", async (req, res) => {
+  const { query } = req.body;
+  if (!query) { res.status(400).json({ error: "Query is required" }); return; }
 
   const queryEmbedding = placeholderEmbedding(query);
   const results = await searchDocuments(queryEmbedding);
-  return c.json(results);
+  res.json(results);
 });
 
-app.use("/static/*", serveStatic({ root: "./" }));
+app.use(express.static(path.join(__dirname, "static")));
 
-app.get("/", serveStatic({ path: "./static/index.html" }));
+app.get("/", (_req, res) => {
+  res.sendFile(path.join(__dirname, "static", "index.html"));
+});
 
-// Initialize DB and start server
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 initDb()
   .then(() => {
     console.log("Database initialized");
-    serve({ fetch: app.fetch, port: PORT }, (info) => {
-      console.log(`Server running on http://localhost:${info.port}`);
+    app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   })
   .catch((err) => {
