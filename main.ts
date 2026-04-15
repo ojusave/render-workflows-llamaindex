@@ -55,10 +55,15 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
   });
+  res.flushHeaders();
+
+  // Send an initial comment to force the connection open
+  res.write(":ok\n\n");
 
   try {
     for await (const event of runPipeline(documentId, tempPath, filename)) {
       res.write(event);
+      if (typeof (res as any).flush === "function") (res as any).flush();
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

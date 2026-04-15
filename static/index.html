@@ -423,18 +423,9 @@
 
       addActivity(feed, 'Uploading <strong>' + escapeHtml(file.name) + '</strong> to <strong>LlamaCloud</strong>...', 'active');
 
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/upload');
-      let seenLength = 0;
-      let buffer = '';
-
-      xhr.onprogress = function() {
-        const newText = xhr.responseText.slice(seenLength);
-        seenLength = xhr.responseText.length;
-        buffer += newText;
-
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop();
+      function parseSSEBuffer() {
+        const parts = sseBuffer.split('\n\n');
+        sseBuffer = parts.pop();
         for (const part of parts) {
           if (!part.trim()) continue;
           let eventType = 'message', eventData = '';
@@ -445,26 +436,46 @@
           if (eventData) {
             try {
               handleEvent(feed, resultSection, errorEl, eventType, JSON.parse(eventData));
-            } catch (e) {}
+            } catch (e) {
+              console.error('SSE parse error:', e, eventData);
+            }
           }
         }
-      };
+      }
 
-      xhr.onload = function() {
-        // Process any remaining buffer
-        xhr.onprogress();
-        stopTimer();
-        loadDocuments();
-      };
+      let sseBuffer = '';
 
-      xhr.onerror = function() {
-        stopTimer();
-        addActivity(feed, 'Connection error', 'error');
-        errorEl.textContent = 'Upload failed';
-        loadDocuments();
-      };
+      // Use fetch with manual stream reading for broadest compatibility
+      try {
+        const response = await fetch('/upload', { method: 'POST', body: formData });
 
-      xhr.send(formData);
+        if (!response.ok) {
+          addActivity(feed, 'Upload failed: HTTP ' + response.status, 'error');
+          stopTimer();
+          loadDocuments();
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          sseBuffer += decoder.decode(value, { stream: true });
+          parseSSEBuffer();
+        }
+
+        // Flush remaining
+        sseBuffer += '\n\n';
+        parseSSEBuffer();
+      } catch (err) {
+        addActivity(feed, 'Connection error: ' + escapeHtml(err.message || String(err)), 'error');
+        errorEl.textContent = err.message || String(err);
+      }
+
+      stopTimer();
+      loadDocuments();
     }
 
     function addActivity(feed, text, state) {
