@@ -362,6 +362,9 @@
       dropZone.classList.remove('drag-over');
       if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
     });
+    dropZone.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'BUTTON') fileInput.click();
+    });
     fileInput.addEventListener('change', () => {
       if (fileInput.files.length > 0) uploadFile(fileInput.files[0]);
       fileInput.value = '';
