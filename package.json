@@ -4,7 +4,7 @@
   "description": "Document intelligence pipeline powered by LlamaCloud and Render Workflows",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r static dist/static",
     "start": "node dist/main.js",
     "start:tasks": "node dist/tasks/index.js",
     "dev": "tsx watch main.ts",

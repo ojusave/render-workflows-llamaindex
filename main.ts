@@ -24,8 +24,7 @@ import { placeholderEmbedding } from "./shared/embedding.js";
 import { runPipeline } from "./pipeline/orchestrator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT_DIR = path.resolve(__dirname, "..");
-const UPLOAD_DIR = path.join(ROOT_DIR, ".uploads");
+const UPLOAD_DIR = path.join(__dirname, ".uploads");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const upload = multer({ dest: UPLOAD_DIR });
@@ -102,11 +101,11 @@ app.post("/search", async (req, res) => {
   res.json(results);
 });
 
-app.use(express.static(path.join(ROOT_DIR, "static"), { maxAge: 0, etag: false }));
+app.use(express.static(path.join(__dirname, "static"), { maxAge: 0, etag: false }));
 
 app.get("/", (_req, res) => {
   res.set("Cache-Control", "no-store");
-  res.sendFile(path.join(ROOT_DIR, "static", "index.html"));
+  res.sendFile(path.join(__dirname, "static", "index.html"));
 });
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
