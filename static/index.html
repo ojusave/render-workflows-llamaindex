@@ -423,40 +423,48 @@
 
       addActivity(feed, 'Uploading <strong>' + escapeHtml(file.name) + '</strong> to <strong>LlamaCloud</strong>...', 'active');
 
-      try {
-        const response = await fetch('/upload', { method: 'POST', body: formData });
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/upload');
+      let seenLength = 0;
+      let buffer = '';
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
+      xhr.onprogress = function() {
+        const newText = xhr.responseText.slice(seenLength);
+        seenLength = xhr.responseText.length;
+        buffer += newText;
 
-          const parts = buffer.split('\n\n');
-          buffer = parts.pop();
-          for (const part of parts) {
-            if (!part.trim()) continue;
-            let eventType = 'message', eventData = '';
-            for (const line of part.split('\n')) {
-              if (line.startsWith('event: ')) eventType = line.slice(7);
-              else if (line.startsWith('data: ')) eventData = line.slice(6);
-            }
-            if (eventData) {
-              try {
-                handleEvent(feed, resultSection, errorEl, eventType, JSON.parse(eventData));
-              } catch (e) {}
-            }
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop();
+        for (const part of parts) {
+          if (!part.trim()) continue;
+          let eventType = 'message', eventData = '';
+          for (const line of part.split('\n')) {
+            if (line.startsWith('event: ')) eventType = line.slice(7);
+            else if (line.startsWith('data: ')) eventData = line.slice(6);
+          }
+          if (eventData) {
+            try {
+              handleEvent(feed, resultSection, errorEl, eventType, JSON.parse(eventData));
+            } catch (e) {}
           }
         }
-      } catch (err) {
-        stopTimer();
-        addActivity(feed, 'Connection error: ' + escapeHtml(err.message), 'error');
-        errorEl.textContent = err.message;
-      }
+      };
 
-      loadDocuments();
+      xhr.onload = function() {
+        // Process any remaining buffer
+        xhr.onprogress();
+        stopTimer();
+        loadDocuments();
+      };
+
+      xhr.onerror = function() {
+        stopTimer();
+        addActivity(feed, 'Connection error', 'error');
+        errorEl.textContent = 'Upload failed';
+        loadDocuments();
+      };
+
+      xhr.send(formData);
     }
 
     function addActivity(feed, text, state) {
