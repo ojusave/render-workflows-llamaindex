@@ -15,6 +15,7 @@
 import { Render } from "@renderinc/sdk";
 import LlamaCloud from "@llamaindex/llama-cloud";
 import fs from "fs";
+import path from "path";
 
 const WORKFLOW_SLUG = process.env.WORKFLOW_SLUG || "render-workflows-llamaindex-workflow";
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || "3000", 10);
@@ -63,6 +64,12 @@ export async function* runPipeline(
     const client = new LlamaCloud({
       apiKey: process.env.LLAMA_CLOUD_API_KEY!,
     });
+
+    // Rename temp file to include original extension so LlamaCloud detects the type
+    const ext = path.extname(filename);
+    const namedPath = filePath + ext;
+    fs.renameSync(filePath, namedPath);
+    filePath = namedPath;
 
     const fileStream = fs.createReadStream(filePath);
     const uploadedFile = await client.files.create({
