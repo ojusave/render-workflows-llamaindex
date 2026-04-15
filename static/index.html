@@ -350,6 +350,7 @@
 
     // State
     let currentView = 'welcome';
+    let pipelineRunning = false;
 
     function showView(view) {
       currentView = view;
@@ -359,7 +360,9 @@
       document.getElementById('search-view').style.display = view === 'search' ? 'block' : 'none';
     }
 
-    function showUpload() { showView('welcome'); }
+    function showUpload() {
+      if (!pipelineRunning) showView('welcome');
+    }
 
     // Drop zone
     const dropZone = document.getElementById('drop-zone');
@@ -407,6 +410,7 @@
 
     // Upload and stream pipeline
     async function uploadFile(file) {
+      pipelineRunning = true;
       showView('pipeline');
       document.getElementById('pipeline-filename').textContent = file.name;
       const feed = document.getElementById('activity-feed');
@@ -415,6 +419,7 @@
       feed.innerHTML = '';
       resultSection.innerHTML = '';
       errorEl.textContent = '';
+      stopTimer();
       startTimer();
       stepStart = Date.now();
 
@@ -474,6 +479,7 @@
         errorEl.textContent = err.message || String(err);
       }
 
+      pipelineRunning = false;
       stopTimer();
       loadDocuments();
     }
@@ -597,7 +603,7 @@
         }
 
         list.innerHTML = docs.map(d => `
-          <div class="doc-item" onclick="showDocument(${d.id})">
+          <div class="doc-item${d.status === 'processing' ? ' active' : ''}" onclick="showDocument(${d.id})" style="${pipelineRunning && d.status === 'processing' ? 'cursor:default;opacity:0.6' : ''}">
             <div class="doc-name">${escapeHtml(d.filename)}</div>
             <div class="doc-meta">
               <span class="status-dot status-${d.status}"></span>
@@ -612,6 +618,7 @@
     }
 
     async function showDocument(id) {
+      if (pipelineRunning) return;
       showView('detail');
       const container = document.getElementById('detail-view');
       container.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem">Loading...</div>';
