@@ -599,37 +599,57 @@
         const res = await fetch('/documents/' + id);
         const doc = await res.json();
 
-        let html = '<div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem">';
-        html += '<h2 style="font-size:1.1rem;font-weight:500;font-family:Inter,sans-serif;color:var(--text-strong)">' + escapeHtml(doc.filename) + '</h2>';
-        if (doc.doc_type) html += '<span class="doc-type-badge badge-' + getBadgeClass(doc.doc_type) + '">' + doc.doc_type + '</span>';
-        html += '<span style="font-size:0.7rem;color:var(--text-dim)">' + (doc.confidence ? (doc.confidence * 100).toFixed(0) + '% confidence' : '') + '</span>';
-        html += '<button class="header-btn" style="margin-left:auto;color:var(--red);border-color:rgba(239,68,68,0.3)" onclick="deleteDoc(' + id + ')">Delete</button>';
-        html += '</div>';
+        const parts = [];
 
-        if (doc.structured_data && Object.keys(doc.structured_data).length > 0) {
-          html += '<div class="result-card"><h3>Extracted Data</h3><div class="field-grid">';
-          for (const [key, value] of Object.entries(doc.structured_data)) {
-            const display = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
-            html += '<div class="field-item"><div class="field-key">' + key.replace(/_/g, ' ') + '</div><div class="field-value">' + escapeHtml(display.slice(0, 500)) + '</div></div>';
-          }
-          html += '</div></div>';
+        // Header row
+        parts.push('<div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;flex-wrap:wrap">');
+        parts.push('<h2 style="font-size:1.1rem;font-weight:500;font-family:Inter,sans-serif;color:var(--text-strong)">' + escapeHtml(doc.filename) + '</h2>');
+        if (doc.doc_type) parts.push('<span class="doc-type-badge badge-' + getBadgeClass(doc.doc_type) + '">' + escapeHtml(doc.doc_type) + '</span>');
+        if (doc.confidence) parts.push('<span style="font-size:0.7rem;color:var(--text-dim)">' + (doc.confidence * 100).toFixed(0) + '% confidence</span>');
+        parts.push('<button class="header-btn" style="margin-left:auto;color:var(--red);border-color:rgba(239,68,68,0.3)" onclick="deleteDoc(' + id + ')">Delete</button>');
+        parts.push('</div>');
+
+        // Status banner for non-completed docs
+        if (doc.status === 'processing') {
+          parts.push('<div class="result-card" style="border-color:var(--amber)"><p style="font-size:0.85rem;color:var(--amber)">This document is still processing. Refresh the page to check for updates.</p></div>');
+        } else if (doc.status === 'failed') {
+          parts.push('<div class="result-card" style="border-color:var(--red)"><p style="font-size:0.85rem;color:var(--red)">Processing failed: ' + escapeHtml(doc.error || 'unknown error') + '</p></div>');
         }
 
-        if (doc.markdown) {
-          html += '<div class="result-card"><h3>Parsed Content</h3>';
-          html += '<div class="markdown-preview">' + escapeHtml(doc.markdown.slice(0, 3000)) + '</div>';
-          html += '</div>';
-        }
-
+        // Classification reasoning
         if (doc.reasoning) {
-          html += '<div class="result-card"><h3>Classification Reasoning</h3>';
-          html += '<p style="font-size:0.8rem;color:var(--text-muted);line-height:1.6">' + escapeHtml(doc.reasoning) + '</p>';
-          html += '</div>';
+          parts.push('<div class="result-card"><h3>Classification Reasoning</h3>');
+          parts.push('<p style="font-size:0.8rem;color:var(--text-muted);line-height:1.6">' + escapeHtml(doc.reasoning) + '</p>');
+          parts.push('</div>');
         }
 
-        container.innerHTML = html;
+        // Extracted data
+        if (doc.structured_data && typeof doc.structured_data === 'object' && Object.keys(doc.structured_data).length > 0) {
+          parts.push('<div class="result-card"><h3>Extracted Data</h3><div class="field-grid">');
+          for (const [key, value] of Object.entries(doc.structured_data)) {
+            let display;
+            if (Array.isArray(value)) {
+              display = value.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join('\n');
+            } else if (typeof value === 'object' && value !== null) {
+              display = JSON.stringify(value, null, 2);
+            } else {
+              display = String(value ?? '');
+            }
+            parts.push('<div class="field-item"><div class="field-key">' + escapeHtml(key.replace(/_/g, ' ')) + '</div><div class="field-value" style="white-space:pre-wrap">' + escapeHtml(display.slice(0, 500)) + '</div></div>');
+          }
+          parts.push('</div></div>');
+        }
+
+        // Parsed content preview
+        if (doc.markdown) {
+          parts.push('<div class="result-card"><h3>Parsed Content</h3>');
+          parts.push('<div class="markdown-preview">' + escapeHtml(doc.markdown.slice(0, 3000)) + '</div>');
+          parts.push('</div>');
+        }
+
+        container.innerHTML = parts.join('');
       } catch (e) {
-        container.innerHTML = '<div style="color:var(--red);font-size:0.8rem">Failed to load document.</div>';
+        container.innerHTML = '<div style="color:var(--red);font-size:0.8rem">Failed to load document: ' + escapeHtml(e.message) + '</div>';
       }
     }
 
