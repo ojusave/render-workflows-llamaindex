@@ -271,7 +271,7 @@
     <div id="sidebar">
       <div class="sidebar-header">
         <h3>Documents</h3>
-        <button class="header-btn" onclick="showUpload()" style="font-size:0.7rem">+ Upload</button>
+        <button class="header-btn" onclick="pipelineRunning = false; showView('welcome')" style="font-size:0.7rem">+ Upload</button>
       </div>
       <div id="doc-list">
         <div class="sidebar-empty">No documents yet.<br/>Upload a file to get started.</div>
@@ -602,16 +602,20 @@
           return;
         }
 
-        list.innerHTML = docs.map(d => `
-          <div class="doc-item${d.status === 'processing' ? ' active' : ''}" onclick="showDocument(${d.id})" style="${pipelineRunning && d.status === 'processing' ? 'cursor:default;opacity:0.6' : ''}">
+        list.innerHTML = docs.map(d => {
+          const isActive = pipelineRunning && d.status === 'processing';
+          const statusLabel = d.status === 'completed' ? (d.doc_type || 'done') :
+                              d.status === 'failed' ? 'failed' : 'processing...';
+          return `
+          <div class="doc-item${isActive ? ' active' : ''}" onclick="showDocument(${d.id})" style="${isActive ? 'cursor:default;opacity:0.7' : ''}">
             <div class="doc-name">${escapeHtml(d.filename)}</div>
             <div class="doc-meta">
               <span class="status-dot status-${d.status}"></span>
-              ${d.doc_type ? '<span class="doc-type-badge badge-' + getBadgeClass(d.doc_type) + '">' + d.doc_type + '</span>' : ''}
+              ${d.status === 'completed' && d.doc_type ? '<span class="doc-type-badge badge-' + getBadgeClass(d.doc_type) + '">' + escapeHtml(d.doc_type) + '</span>' : '<span style="font-size:0.6rem;color:var(--text-dim)">' + statusLabel + '</span>'}
               <span>${timeAgo(d.created_at)}</span>
             </div>
-          </div>
-        `).join('');
+          </div>`;
+        }).join('');
       } catch (e) {
         // Ignore
       }

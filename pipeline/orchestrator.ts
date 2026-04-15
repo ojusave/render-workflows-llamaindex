@@ -157,6 +157,8 @@ export async function* runPipeline(
   } catch (err) {
     const elapsed = Math.round((Date.now() - t0) / 1000);
     const message = err instanceof Error ? err.message : String(err);
+    const { updateDocumentError } = await import("../shared/db.js");
+    await updateDocumentError(documentId, message);
     yield sse("error", { message, elapsed, documentId });
   } finally {
     // Clean up temp file
