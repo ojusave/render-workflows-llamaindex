@@ -74,6 +74,56 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   res.end();
 });
 
+app.post("/upload-url", async (req, res) => {
+  const { url } = req.body;
+  if (!url) {
+    res.status(400).json({ error: "No URL provided" });
+    return;
+  }
+
+  const parsedUrl = new URL(url);
+  const filename = path.basename(parsedUrl.pathname) || "document.pdf";
+  const tempPath = path.join(UPLOAD_DIR, `${Date.now()}-${filename}`);
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      res.status(400).json({ error: `Failed to download: HTTP ${response.status}` });
+      return;
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(tempPath, buffer);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ error: `Failed to download: ${message}` });
+    return;
+  }
+
+  const documentId = await insertDocument(filename);
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.flushHeaders();
+  res.write(":ok\n\n");
+
+  try {
+    for await (const event of runPipeline(documentId, tempPath, filename)) {
+      res.write(event);
+      if (typeof (res as any).flush === "function") (res as any).flush();
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await updateDocumentError(documentId, message);
+    res.write(`event: error\ndata: ${JSON.stringify({ message, documentId })}\n\n`);
+  }
+
+  res.end();
+});
+
 app.get("/documents", async (_req, res) => {
   const docs = await listDocuments();
   res.json(docs);

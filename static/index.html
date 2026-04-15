@@ -289,6 +289,13 @@
             <button class="browse-btn" onclick="document.getElementById('file-input').click()">Browse files</button>
             <input type="file" id="file-input" />
           </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;max-width:480px;width:100%">
+            <span style="font-size:0.75rem;color:var(--text-dim)">or</span>
+          </div>
+          <div class="search-bar" style="margin-top:0.5rem;margin-bottom:0">
+            <input type="text" id="url-input" placeholder="Paste a URL to a PDF or document..." />
+            <button onclick="uploadFromUrl()">Fetch</button>
+          </div>
         </div>
 
         <div id="pipeline-view">
@@ -382,6 +389,88 @@
       if (fileInput.files.length > 0) uploadFile(fileInput.files[0]);
       fileInput.value = '';
     });
+
+    // URL upload
+    document.getElementById('url-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') uploadFromUrl();
+    });
+
+    async function uploadFromUrl() {
+      const urlInput = document.getElementById('url-input');
+      const url = urlInput.value.trim();
+      if (!url) return;
+      urlInput.value = '';
+
+      const filename = url.split('/').pop().split('?')[0] || 'document.pdf';
+
+      pipelineRunning = true;
+      showView('pipeline');
+      document.getElementById('pipeline-filename').textContent = filename;
+      const feed = document.getElementById('activity-feed');
+      const resultSection = document.getElementById('result-section');
+      const errorEl = document.getElementById('pipeline-error');
+      feed.innerHTML = '';
+      resultSection.innerHTML = '';
+      errorEl.textContent = '';
+      stopTimer();
+      startTimer();
+      stepStart = Date.now();
+
+      addActivity(feed, 'Downloading <strong>' + escapeHtml(filename) + '</strong> from URL...', 'active');
+
+      function parseSSEBuffer() {
+        const parts = sseBuffer.split('\n\n');
+        sseBuffer = parts.pop();
+        for (const part of parts) {
+          if (!part.trim()) continue;
+          let eventType = 'message', eventData = '';
+          for (const line of part.split('\n')) {
+            if (line.startsWith('event: ')) eventType = line.slice(7);
+            else if (line.startsWith('data: ')) eventData = line.slice(6);
+          }
+          if (eventData) {
+            try { handleEvent(feed, resultSection, errorEl, eventType, JSON.parse(eventData)); } catch (e) {}
+          }
+        }
+      }
+
+      let sseBuffer = '';
+
+      try {
+        const response = await fetch('/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          addActivity(feed, 'Download failed: ' + escapeHtml(err.error || 'unknown'), 'error');
+          pipelineRunning = false;
+          stopTimer();
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          sseBuffer += decoder.decode(value, { stream: true });
+          parseSSEBuffer();
+        }
+        sseBuffer += '\n\n';
+        parseSSEBuffer();
+      } catch (err) {
+        addActivity(feed, 'Error: ' + escapeHtml(err.message || String(err)), 'error');
+        errorEl.textContent = err.message || String(err);
+      }
+
+      pipelineRunning = false;
+      stopTimer();
+      loadDocuments();
+    }
 
     // Timer
     let timerInterval = null;
