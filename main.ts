@@ -15,7 +15,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { serve } from "@hono/node-server";
-import { stream } from "hono/streaming";
+import { streamSSE } from "hono/streaming";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -57,21 +57,21 @@ app.post("/upload", async (c) => {
 
   const documentId = await insertDocument(filename);
 
-  c.header("Content-Type", "text/event-stream");
-  c.header("Cache-Control", "no-cache");
-  c.header("Connection", "keep-alive");
-
-  return stream(c, async (s) => {
+  return streamSSE(c, async (stream) => {
     try {
-      for await (const event of runPipeline(documentId, tempPath, filename)) {
-        await s.write(event);
+      for await (const raw of runPipeline(documentId, tempPath, filename)) {
+        const eventMatch = raw.match(/^event: (.+)\ndata: (.+)\n\n$/s);
+        if (eventMatch) {
+          await stream.writeSSE({ event: eventMatch[1], data: eventMatch[2] });
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await updateDocumentError(documentId, message);
-      await s.write(
-        `event: error\ndata: ${JSON.stringify({ message, documentId })}\n\n`
-      );
+      await stream.writeSSE({
+        event: "error",
+        data: JSON.stringify({ message, documentId }),
+      });
     }
   });
 });
