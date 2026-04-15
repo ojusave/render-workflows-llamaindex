@@ -1,6 +1,7 @@
 {
   "name": "render-workflows-llamaindex",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "Document intelligence pipeline powered by LlamaCloud and Render Workflows",
   "type": "module",
   "scripts": {
