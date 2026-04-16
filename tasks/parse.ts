@@ -15,8 +15,6 @@ export const parseDocument = task(
   async function parseDocument(fileId: string): Promise<{
     markdown: string;
     text: string;
-    pageCount: number;
-    pages: Array<{ pageNumber: number; markdown: string }>;
   }> {
     const client = getLlamaClient();
 
@@ -24,29 +22,15 @@ export const parseDocument = task(
       file_id: fileId,
       tier: "agentic",
       version: "latest",
-      expand: ["markdown", "text"],
+      expand: ["markdown_full", "text_full"],
     });
 
-    const pages: Array<{ pageNumber: number; markdown: string }> = [];
-    if (result.markdown?.pages) {
-      for (const p of result.markdown.pages) {
-        if ("markdown" in p && p.markdown) {
-          pages.push({
-            pageNumber: p.page_number ?? 0,
-            markdown: p.markdown,
-          });
-        }
-      }
-    }
-
-    const fullMarkdown = pages.map((p) => p.markdown).join("\n\n---\n\n");
+    const fullMarkdown = result.markdown_full ?? "";
     const fullText = result.text_full ?? "";
 
     return {
       markdown: fullMarkdown,
       text: fullText,
-      pageCount: pages.length,
-      pages,
     };
-  }
+  },
 );

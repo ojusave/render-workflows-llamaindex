@@ -9,50 +9,137 @@ import os from "os";
 import path from "path";
 import { task } from "@renderinc/sdk/workflows";
 import { getLlamaClient } from "../shared/llama-client.js";
+import { fileTypeFromBuffer } from "file-type";
+
+const SupportedExtensions = [
+  ".pdf",
+  ".abw",
+  ".awt",
+  ".cgm",
+  ".cwk",
+  ".doc",
+  ".docm",
+  ".docx",
+  ".dot",
+  ".dotm",
+  ".dotx",
+  ".fodg",
+  ".fodp",
+  ".fopd",
+  ".fodt",
+  ".fb2",
+  ".hwp",
+  ".lwp",
+  ".mcw",
+  ".mw",
+  ".mwd",
+  ".odf",
+  ".odt",
+  ".otg",
+  ".ott",
+  ".pages",
+  ".pbd",
+  ".psw",
+  ".rtf",
+  ".sda",
+  ".sdd",
+  ".sdp",
+  ".sdw",
+  ".sgl",
+  ".std",
+  ".stw",
+  ".sxd",
+  ".sxg",
+  ".sxm",
+  ".sxw",
+  ".uof",
+  ".uop",
+  ".uot",
+  ".vor",
+  ".wpd",
+  ".wps",
+  ".wpt",
+  ".wri",
+  ".wn",
+  ".xml",
+  ".zabw",
+  ".key",
+  ".odp",
+  ".odg",
+  ".otp",
+  ".pot",
+  ".potm",
+  ".potx",
+  ".ppt",
+  ".pptm",
+  ".pptx",
+  ".sti",
+  ".sxi",
+  ".vsd",
+  ".vsdm",
+  ".vsdx",
+  ".vdx",
+  ".bmp",
+  ".gif",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".svg",
+  ".tif",
+  ".tiff",
+  ".webp",
+  ".htm",
+  ".html",
+  ".xhtm",
+  ".csv",
+  ".dbf",
+  ".dif",
+  ".et",
+  ".eth",
+  ".fods",
+  ".numbers",
+  ".ods",
+  ".ots",
+  ".prn",
+  ".qpw",
+  ".slk",
+  ".stc",
+  ".sxc",
+  ".sylk",
+  ".tsv",
+  ".uos1",
+  ".uos2",
+  ".uos",
+  ".wb1",
+  ".wb2",
+  ".wb3",
+  ".wk1",
+  ".wk2",
+  ".wk3",
+  ".wk4",
+  ".wks",
+  ".wq1",
+];
 
 /**
  * LlamaCloud infers file type from the path extension. Names like "download" or
- * ".bin" yield "Unsupported file type: None". Prefer real extensions; sniff bytes when missing.
+ * ".bin" yield "Unsupported file type: None". Prefer real extensions; infer extension when one is missing.
  */
-function inferExtension(filename: string, buf: Buffer): string {
+async function inferExtension(filename: string, buf: Buffer): Promise<string> {
   const fromName = path.extname(filename).toLowerCase();
-  if (fromName && fromName !== ".bin") {
+  if (fromName) {
+    if (!SupportedExtensions.includes(fromName)) {
+      throw new Error(`Unsupported file type: '${fromName}'`);
+    }
     return fromName;
   }
 
-  if (buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) {
-    return ".pdf";
-  }
-  if (buf.length >= 5 && buf.subarray(0, 5).toString("ascii") === "%PDF-") {
-    return ".pdf";
-  }
-  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xd8) {
-    return ".jpg";
-  }
-  if (
-    buf.length >= 8 &&
-    buf[0] === 0x89 &&
-    buf[1] === 0x50 &&
-    buf[2] === 0x4e &&
-    buf[3] === 0x47
-  ) {
-    return ".png";
-  }
-  if (buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04) {
-    return ".docx";
-  }
-
-  const sample = buf.subarray(0, Math.min(buf.length, 2048));
-  let printable = 0;
-  for (let i = 0; i < sample.length; i++) {
-    const b = sample[i];
-    if (b === undefined) continue;
-    if (b === 9 || b === 10 || b === 13 || (b >= 32 && b <= 126)) {
-      printable++;
+  const ft = await fileTypeFromBuffer(buf);
+  if (ft && ft.ext) {
+    if (!SupportedExtensions.includes("." + ft.ext)) {
+      throw new Error(`Unsupported file type: '.${ft.ext}'`);
     }
-  }
-  if (sample.length > 20 && printable / sample.length > 0.97) {
-    return ".txt";
+    return "." + ft.ext;
   }
 
   return ".pdf";
@@ -67,7 +154,7 @@ export const uploadToLlamaCloud = task(
   },
   async function uploadToLlamaCloud(
     fileBase64: string,
-    filename: string
+    filename: string,
   ): Promise<{ fileId: string }> {
     const buf = Buffer.from(fileBase64, "base64");
     if (buf.length === 0) {
@@ -75,8 +162,10 @@ export const uploadToLlamaCloud = task(
     }
 
     const extFromName = path.extname(filename);
-    const stem = path.basename(filename, extFromName).replace(/[^a-zA-Z0-9._-]/g, "_") || "document";
-    const ext = inferExtension(filename, buf);
+    const stem =
+      path.basename(filename, extFromName).replace(/[^a-zA-Z0-9._-]/g, "_") ||
+      "document";
+    const ext = await inferExtension(filename, buf);
     const tmpPath = path.join(os.tmpdir(), `lc-${Date.now()}-${stem}${ext}`);
 
     fs.writeFileSync(tmpPath, buf);
@@ -95,5 +184,5 @@ export const uploadToLlamaCloud = task(
         /* ignore */
       }
     }
-  }
+  },
 );
