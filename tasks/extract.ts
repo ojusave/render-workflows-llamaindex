@@ -16,7 +16,7 @@ export const extractFields = task(
   },
   async function extractFields(
     fileId: string,
-    docType: string
+    docType: string,
   ): Promise<{
     extractedData: Record<string, unknown>;
     schemaUsed: Record<string, unknown>;
@@ -37,14 +37,21 @@ export const extractFields = task(
         schema = {
           type: "object",
           properties: {
-            summary: { type: "string", description: "Brief summary of the document content" },
-            key_fields: { type: "array", items: { type: "string" }, description: "Important data points found" },
+            summary: {
+              type: "string",
+              description: "Brief summary of the document content",
+            },
+            key_fields: {
+              type: "array",
+              items: { type: "string" },
+              description: "Important data points found",
+            },
           } as Record<string, unknown>,
         };
       }
     }
 
-    const job = await client.extract.create({
+    const result = await client.extract.run({
       file_input: fileId,
       configuration: {
         data_schema: schema,
@@ -52,17 +59,6 @@ export const extractFields = task(
         confidence_scores: true,
       },
     });
-
-    const poll = async () => {
-      while (true) {
-        const status = await client.extract.get(job.id);
-        if (status.status === "COMPLETED") return status;
-        if (status.status === "FAILED") throw new Error(status.error_message ?? "Extract failed");
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-    };
-
-    const result = await poll();
 
     const extractResult = result.extract_result;
     const extractedData: Record<string, unknown> =
@@ -72,5 +68,5 @@ export const extractFields = task(
       extractedData,
       schemaUsed: schema,
     };
-  }
+  },
 );
