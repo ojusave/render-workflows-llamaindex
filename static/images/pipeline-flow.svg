@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="120" x2="1480" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#08111B" />
+      <stop offset="0.6" stop-color="#0A1624" />
+      <stop offset="1" stop-color="#111827" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#020617" flood-opacity="0.34" />
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#94A3B8" />
+    </marker>
+    <marker id="arrowTeal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#2DD4BF" />
+    </marker>
+    <style>
+      .title { fill: #F8FAFC; font: 700 56px 'Inter', 'Segoe UI', Arial, sans-serif; text-anchor: middle; }
+      .subtitle { fill: #93A6BC; font: 500 24px 'Inter', 'Segoe UI', Arial, sans-serif; text-anchor: middle; }
+      .stepTitle { fill: #F8FAFC; font: 700 30px 'Inter', 'Segoe UI', Arial, sans-serif; }
+      .stepBody { fill: #D2DCE8; font: 500 20px 'Inter', 'Segoe UI', Arial, sans-serif; }
+      .kicker { fill: #AFC1D6; font: 700 14px 'Inter', 'Segoe UI', Arial, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; }
+      .bannerTitle { fill: #F8FAFC; font: 700 30px 'Inter', 'Segoe UI', Arial, sans-serif; text-anchor: middle; }
+      .label { fill: #CBD5E1; font: 600 18px 'Inter', 'Segoe UI', Arial, sans-serif; text-anchor: middle; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" fill="url(#bg)" />
+  <rect x="26" y="26" width="1548" height="928" rx="30" fill="white" fill-opacity="0.02" stroke="white" stroke-opacity="0.08" />
+
+  <text x="800" y="92" class="title">Document Intelligence Pipeline</text>
+  <text x="800" y="126" class="subtitle">Task-by-task flow reflected in the current Render workflow implementation</text>
+
+  <g filter="url(#shadow)">
+    <rect x="72" y="188" width="1460" height="82" rx="22" fill="#111C2A" stroke="#334155" stroke-width="2.5" stroke-dasharray="10 10" />
+    <text x="800" y="238" class="label">Express streams SSE progress while tasks run on the workflow service</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="72" y="320" width="250" height="220" rx="24" fill="#0E1724" stroke="#E5E7EB" stroke-width="3" />
+    <text x="102" y="362" class="kicker">Web service</text>
+    <text x="102" y="412" class="stepTitle">Upload</text>
+    <text x="102" y="454" class="stepBody">Accept multipart file</text>
+    <text x="102" y="486" class="stepBody">or fetch a remote URL.</text>
+    <text x="102" y="534" class="stepBody">Create the initial</text>
+    <text x="102" y="566" class="stepBody">document row.</text>
+
+    <rect x="362" y="320" width="250" height="220" rx="24" fill="#27160A" stroke="#FB923C" stroke-width="3" />
+    <text x="392" y="362" class="kicker">Task 1</text>
+    <text x="392" y="412" class="stepTitle">Upload to</text>
+    <text x="392" y="448" class="stepTitle">LlamaCloud</text>
+    <text x="392" y="494" class="stepBody">`upload_to_llamacloud`</text>
+    <text x="392" y="526" class="stepBody">materializes bytes with</text>
+    <text x="392" y="558" class="stepBody">a real extension and</text>
+    <text x="392" y="590" class="stepBody">creates a LlamaCloud file.</text>
+
+    <rect x="652" y="320" width="250" height="220" rx="24" fill="#0E231A" stroke="#4ADE80" stroke-width="3" />
+    <text x="682" y="362" class="kicker">Task 2</text>
+    <text x="682" y="412" class="stepTitle">Classify</text>
+    <text x="682" y="460" class="stepBody">`classify_document`</text>
+    <text x="682" y="492" class="stepBody">runs LlamaCloud</text>
+    <text x="682" y="524" class="stepBody">Classify and returns</text>
+    <text x="682" y="556" class="stepBody">doc type, confidence,</text>
+    <text x="682" y="588" class="stepBody">and reasoning.</text>
+
+    <rect x="942" y="320" width="250" height="220" rx="24" fill="#10213F" stroke="#60A5FA" stroke-width="3" />
+    <text x="972" y="362" class="kicker">Task 3</text>
+    <text x="972" y="412" class="stepTitle">Parse</text>
+    <text x="972" y="460" class="stepBody">`parse_document`</text>
+    <text x="972" y="492" class="stepBody">calls LlamaParse</text>
+    <text x="972" y="524" class="stepBody">agentic tier and stores</text>
+    <text x="972" y="556" class="stepBody">clean markdown plus</text>
+    <text x="972" y="588" class="stepBody">raw text.</text>
+
+    <rect x="1232" y="320" width="250" height="220" rx="24" fill="#0F2E2C" stroke="#2DD4BF" stroke-width="3" />
+    <text x="1262" y="362" class="kicker">Task 4</text>
+    <text x="1262" y="412" class="stepTitle">Extract</text>
+    <text x="1262" y="460" class="stepBody">`extract_fields`</text>
+    <text x="1262" y="492" class="stepBody">uses a schema from</text>
+    <text x="1262" y="524" class="stepBody">`tasks/schemas.ts` or</text>
+    <text x="1262" y="556" class="stepBody">generates one for</text>
+    <text x="1262" y="588" class="stepBody">unknown document types.</text>
+  </g>
+
+  <path d="M322 430H352" stroke="#94A3B8" stroke-width="4" marker-end="url(#arrow)" />
+  <path d="M612 430H642" stroke="#94A3B8" stroke-width="4" marker-end="url(#arrow)" />
+  <path d="M902 430H932" stroke="#94A3B8" stroke-width="4" marker-end="url(#arrow)" />
+  <path d="M1192 430H1222" stroke="#94A3B8" stroke-width="4" marker-end="url(#arrow)" />
+
+  <g filter="url(#shadow)">
+    <rect x="280" y="626" width="290" height="212" rx="24" fill="#14303D" stroke="#67E8F9" stroke-width="3" />
+    <text x="314" y="668" class="kicker">Task 5</text>
+    <text x="314" y="718" class="stepTitle">Store results</text>
+    <text x="314" y="766" class="stepBody">Persist classification,</text>
+    <text x="314" y="798" class="stepBody">parsed text, file ID, and</text>
+    <text x="314" y="830" class="stepBody">structured JSON in Postgres.</text>
+
+    <rect x="656" y="626" width="290" height="212" rx="24" fill="#122C2A" stroke="#2DD4BF" stroke-width="3" />
+    <text x="690" y="668" class="kicker">Optional index</text>
+    <text x="690" y="718" class="stepTitle">Upsert parsed text</text>
+    <text x="690" y="766" class="stepBody">If `LLAMACLOUD_PIPELINE_ID`</text>
+    <text x="690" y="798" class="stepBody">is set, `store_results` writes</text>
+    <text x="690" y="830" class="stepBody">parsed text into the pipeline.</text>
+
+    <rect x="1032" y="626" width="290" height="212" rx="24" fill="#1F2340" stroke="#A78BFA" stroke-width="3" />
+    <text x="1066" y="668" class="kicker">Later retrieval</text>
+    <text x="1066" y="718" class="stepTitle">Search and Ask</text>
+    <text x="1066" y="766" class="stepBody">`/search` retrieves chunks.</text>
+    <text x="1066" y="798" class="stepBody">`/ask` formats retrieved</text>
+    <text x="1066" y="830" class="stepBody">passages for the UI.</text>
+  </g>
+
+  <path d="M1357 540V590C1357 620 433 620 433 618" stroke="#94A3B8" stroke-width="4" marker-end="url(#arrow)" />
+  <path d="M570 732H646" stroke="#2DD4BF" stroke-width="4" stroke-dasharray="10 8" marker-end="url(#arrowTeal)" />
+  <path d="M946 732H1022" stroke="#94A3B8" stroke-width="4" marker-end="url(#arrow)" />
+
+  <g filter="url(#shadow)">
+    <rect x="72" y="876" width="1460" height="56" rx="18" fill="#261945" stroke="#A855F7" stroke-width="3" />
+    <text x="800" y="912" class="bannerTitle">Render Workflows runs the pipeline; Postgres stores records; LlamaCloud handles optional indexing and retrieval</text>
+  </g>
+</svg>

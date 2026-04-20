@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="80" x2="1480" y2="920" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#08111B" />
+      <stop offset="0.55" stop-color="#0A1624" />
+      <stop offset="1" stop-color="#111827" />
+    </linearGradient>
+    <linearGradient id="browserFill" x1="60" y1="180" x2="360" y2="840" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#25123E" />
+      <stop offset="1" stop-color="#160F2D" />
+    </linearGradient>
+    <linearGradient id="renderFill" x1="410" y1="160" x2="1170" y2="860" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#132B4A" />
+      <stop offset="1" stop-color="#0F1E34" />
+    </linearGradient>
+    <linearGradient id="cloudFill" x1="1210" y1="180" x2="1530" y2="840" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2E2410" />
+      <stop offset="1" stop-color="#20180B" />
+    </linearGradient>
+    <linearGradient id="workflowFill" x1="470" y1="386" x2="1090" y2="626" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#352067" />
+      <stop offset="1" stop-color="#221445" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#020617" flood-opacity="0.35" />
+    </filter>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#A855F7" />
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#60A5FA" />
+    </marker>
+    <marker id="arrowTeal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#2DD4BF" />
+    </marker>
+    <marker id="arrowGold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#FBBF24" />
+    </marker>
+    <style>
+      .title { fill: #F8FAFC; font: 700 58px 'Inter', 'Segoe UI', Arial, sans-serif; text-anchor: middle; }
+      .subtitle { fill: #93A6BC; font: 500 24px 'Inter', 'Segoe UI', Arial, sans-serif; text-anchor: middle; }
+      .zoneTitle { fill: #F8FAFC; font: 700 34px 'Inter', 'Segoe UI', Arial, sans-serif; text-anchor: middle; }
+      .zoneNote { fill: #9FB0C4; font: 500 18px 'Inter', 'Segoe UI', Arial, sans-serif; text-anchor: middle; }
+      .cardTitle { fill: #F8FAFC; font: 700 28px 'Inter', 'Segoe UI', Arial, sans-serif; }
+      .cardBody { fill: #C7D3E0; font: 500 20px 'Inter', 'Segoe UI', Arial, sans-serif; }
+      .miniTitle { fill: #F8FAFC; font: 700 18px 'Inter', 'Segoe UI', Arial, sans-serif; }
+      .miniBody { fill: #C7D3E0; font: 500 15px 'Inter', 'Segoe UI', Arial, sans-serif; }
+      .label { fill: #CBD5E1; font: 600 18px 'Inter', 'Segoe UI', Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" fill="url(#bg)" />
+  <rect x="26" y="26" width="1548" height="928" rx="30" fill="white" fill-opacity="0.02" stroke="white" stroke-opacity="0.08" />
+
+  <text x="800" y="92" class="title">Document Intelligence Pipeline</text>
+  <text x="800" y="126" class="subtitle">Code-accurate system layout from the current Express app, workflow tasks, and LlamaIndex cloud calls</text>
+
+  <g filter="url(#shadow)">
+    <rect x="60" y="176" width="300" height="690" rx="28" fill="url(#browserFill)" stroke="#C084FC" stroke-width="3" />
+    <text x="210" y="238" class="zoneTitle">Browser</text>
+    <text x="210" y="268" class="zoneNote">Upload, monitor, inspect, search</text>
+
+    <rect x="96" y="326" width="228" height="112" rx="18" fill="#8B5CF6" fill-opacity="0.12" stroke="#C084FC" stroke-width="2.5" />
+    <text x="120" y="372" class="cardTitle" font-size="28">Upload UI</text>
+    <text x="120" y="404" class="cardBody" font-size="18">File upload and URL fetch</text>
+
+    <rect x="96" y="470" width="228" height="112" rx="18" fill="#8B5CF6" fill-opacity="0.12" stroke="#C084FC" stroke-width="2.5" />
+    <text x="120" y="516" class="cardTitle" font-size="28">Run Feed</text>
+    <text x="120" y="548" class="cardBody" font-size="18">SSE progress and status</text>
+
+    <rect x="96" y="614" width="228" height="156" rx="18" fill="#8B5CF6" fill-opacity="0.12" stroke="#C084FC" stroke-width="2.5" />
+    <text x="120" y="660" class="cardTitle" font-size="28">Documents + Ask</text>
+    <text x="120" y="692" class="cardBody" font-size="18">Inspect extracted fields,</text>
+    <text x="120" y="720" class="cardBody" font-size="18">search indexed text, and</text>
+    <text x="120" y="748" class="cardBody" font-size="18">format retrieved passages</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="410" y="160" width="760" height="710" rx="30" fill="url(#renderFill)" stroke="#60A5FA" stroke-width="3" />
+    <text x="790" y="224" class="zoneTitle">Render</text>
+    <text x="790" y="254" class="zoneNote">Web service plus separately deployed workflow runtime</text>
+
+    <rect x="468" y="302" width="644" height="116" rx="22" fill="#3B82F6" fill-opacity="0.18" stroke="#60A5FA" stroke-width="3" />
+    <text x="790" y="352" class="cardTitle" text-anchor="middle">Express Web Service</text>
+    <text x="790" y="386" class="cardBody" text-anchor="middle">Accept uploads, create document rows, stream SSE, and dispatch workflow tasks</text>
+
+    <rect x="468" y="468" width="644" height="214" rx="24" fill="url(#workflowFill)" stroke="#A78BFA" stroke-width="3" />
+    <text x="790" y="522" class="cardTitle" text-anchor="middle">Render Workflow Service</text>
+    <text x="790" y="554" class="cardBody" text-anchor="middle">Each stage runs as an isolated task with its own retries and timeout</text>
+
+    <rect x="506" y="584" width="118" height="62" rx="16" fill="#6D28D9" stroke="#F59E0B" stroke-width="3" />
+    <text x="565" y="622" class="miniTitle" text-anchor="middle">upload_to</text>
+    <text x="565" y="642" class="miniBody" text-anchor="middle">_llamacloud</text>
+
+    <rect x="642" y="584" width="112" height="62" rx="16" fill="#064E3B" stroke="#4ADE80" stroke-width="3" />
+    <text x="698" y="622" class="miniTitle" text-anchor="middle">classify_</text>
+    <text x="698" y="642" class="miniBody" text-anchor="middle">document</text>
+
+    <rect x="772" y="584" width="112" height="62" rx="16" fill="#1E3A8A" stroke="#60A5FA" stroke-width="3" />
+    <text x="828" y="622" class="miniTitle" text-anchor="middle">parse_</text>
+    <text x="828" y="642" class="miniBody" text-anchor="middle">document</text>
+
+    <rect x="902" y="584" width="112" height="62" rx="16" fill="#0F766E" stroke="#2DD4BF" stroke-width="3" />
+    <text x="958" y="622" class="miniTitle" text-anchor="middle">extract_</text>
+    <text x="958" y="642" class="miniBody" text-anchor="middle">fields</text>
+
+    <rect x="1032" y="584" width="112" height="62" rx="16" fill="#164E63" stroke="#67E8F9" stroke-width="3" />
+    <text x="1088" y="622" class="miniTitle" text-anchor="middle">store_</text>
+    <text x="1088" y="642" class="miniBody" text-anchor="middle">results</text>
+
+    <ellipse cx="630" cy="772" rx="132" ry="44" fill="#0F3A46" stroke="#2DD4BF" stroke-width="3" />
+    <text x="630" y="780" class="cardTitle" text-anchor="middle" font-size="28">Postgres</text>
+    <text x="630" y="812" class="cardBody" text-anchor="middle" font-size="18">documents table, parsed text, structured JSON</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1210" y="176" width="320" height="690" rx="28" fill="url(#cloudFill)" stroke="#FBBF24" stroke-width="3" />
+    <text x="1370" y="238" class="zoneTitle">LlamaIndex Cloud</text>
+    <text x="1370" y="268" class="zoneNote">LlamaCloud APIs and optional pipeline retrieval</text>
+
+    <rect x="1258" y="318" width="224" height="90" rx="18" fill="#F59E0B" fill-opacity="0.10" stroke="#FBBF24" stroke-width="2.5" />
+    <text x="1370" y="374" class="cardTitle" text-anchor="middle" font-size="28">Files</text>
+
+    <rect x="1258" y="434" width="224" height="90" rx="18" fill="#F59E0B" fill-opacity="0.10" stroke="#FBBF24" stroke-width="2.5" />
+    <text x="1370" y="490" class="cardTitle" text-anchor="middle" font-size="28">Classify</text>
+
+    <rect x="1258" y="550" width="224" height="90" rx="18" fill="#F59E0B" fill-opacity="0.10" stroke="#FBBF24" stroke-width="2.5" />
+    <text x="1370" y="606" class="cardTitle" text-anchor="middle" font-size="28">LlamaParse</text>
+
+    <rect x="1258" y="666" width="224" height="90" rx="18" fill="#F59E0B" fill-opacity="0.10" stroke="#FBBF24" stroke-width="2.5" />
+    <text x="1370" y="722" class="cardTitle" text-anchor="middle" font-size="28">LlamaExtract + Pipeline</text>
+  </g>
+
+  <path d="M323 382C372 382 402 382 447 382" stroke="#A855F7" stroke-width="4" marker-end="url(#arrowPurple)" />
+  <text x="374" y="360" class="label">upload / URL</text>
+
+  <path d="M447 340C392 340 372 340 323 340" stroke="#60A5FA" stroke-width="4" marker-end="url(#arrowBlue)" />
+  <text x="384" y="318" class="label">SSE progress</text>
+
+  <path d="M790 418V458" stroke="#60A5FA" stroke-width="4" marker-end="url(#arrowBlue)" />
+  <text x="818" y="446" class="label">startTask + poll</text>
+
+  <path d="M624 615C792 615 1012 615 1248 363" stroke="#FBBF24" stroke-width="4" marker-end="url(#arrowGold)" />
+  <path d="M698 615C846 615 1060 615 1248 479" stroke="#4ADE80" stroke-width="4" marker-end="url(#arrowGold)" />
+  <path d="M828 615C944 615 1090 615 1248 595" stroke="#60A5FA" stroke-width="4" marker-end="url(#arrowGold)" />
+  <path d="M958 615C1066 615 1160 615 1248 711" stroke="#2DD4BF" stroke-width="4" marker-end="url(#arrowTeal)" />
+
+  <path d="M1088 646V706C1088 748 808 748 766 748" stroke="#2DD4BF" stroke-width="4" marker-end="url(#arrowTeal)" />
+  <text x="1010" y="732" class="label">persist result row</text>
+
+  <path d="M1144 615C1190 615 1210 615 1248 711" stroke="#67E8F9" stroke-width="4" stroke-dasharray="10 8" marker-end="url(#arrowTeal)" />
+  <text x="1128" y="590" class="label">optional indexing</text>
+
+  <path d="M323 690C392 690 420 690 468 690" stroke="#A855F7" stroke-width="4" marker-end="url(#arrowPurple)" />
+  <text x="390" y="668" class="label">documents / ask / search</text>
+
+  <path d="M1112 356C1178 356 1196 356 1250 356" stroke="#60A5FA" stroke-width="4" stroke-dasharray="10 8" marker-end="url(#arrowBlue)" />
+  <text x="1118" y="334" class="label">retrieveFromConfiguredPipeline</text>
+</svg>

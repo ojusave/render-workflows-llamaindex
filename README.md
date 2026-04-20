@@ -2,7 +2,7 @@
 
 # Document Intelligence Pipeline
 
-Upload PDFs and other documents. A thin Express app hands off LlamaIndex-powered LlamaCloud classify, parse, and extract work to Render Workflows, stores document rows in Postgres, and can optionally index content into a LlamaCloud pipeline for search and Ask.
+Upload PDFs and other documents. An Express app dispatches LlamaIndex-powered LlamaCloud classify, parse, and extract tasks through Render Workflows, stores results in Postgres, and can optionally index parsed text for search and Ask.
 
 <p>
   <a href="https://render.com/deploy?repo=https://github.com/ojusave/render-workflows-llamaindex">
@@ -45,46 +45,11 @@ These diagrams match the current code paths in [`main.ts`](main.ts), [`pipeline/
 
 ### System layout
 
-```mermaid
-flowchart LR
-  Browser["Browser UI"] -->|"Upload file / URL"| Web["Express web service"]
-  Web -->|"SSE progress"| Browser
-  Web -->|"startTask + poll"| Workflow["Render Workflow service"]
-
-  Workflow --> Upload["upload_to_llamacloud"]
-  Upload --> Files["LlamaCloud Files"]
-
-  Upload --> Classify["classify_document"]
-  Classify --> ClassifyAPI["LlamaCloud Classify"]
-
-  Classify --> Parse["parse_document"]
-  Parse --> ParseAPI["LlamaParse"]
-
-  Parse --> Extract["extract_fields"]
-  Extract --> ExtractAPI["LlamaExtract"]
-
-  Extract --> Store["store_results"]
-  Store --> DB["Postgres documents table"]
-  Store -. "optional indexing" .-> Pipeline["LlamaCloud pipeline"]
-
-  Browser -->|"Search / Ask"| Web
-  Web -->|"retrieveFromConfiguredPipeline"| Pipeline
-```
+![System layout](static/images/architecture-diagram.svg)
 
 ### Pipeline flow
 
-```mermaid
-flowchart LR
-  A["Upload file or URL"] --> B["Create document row in Postgres"]
-  B --> C["upload_to_llamacloud"]
-  C --> D["classify_document"]
-  D --> E["parse_document"]
-  E --> F["extract_fields"]
-  F --> G["store_results"]
-  G --> H["Persist classification, parsed text, and structured data"]
-  G -. "if LLAMACLOUD_PIPELINE_ID is set" .-> I["Upsert parsed text into a LlamaCloud pipeline"]
-  I --> J["Search and Ask retrieve passages later"]
-```
+![Pipeline flow](static/images/pipeline-flow.svg)
 
 The web service accepts file uploads or URLs, reads bytes from disk, and dispatches five [workflow tasks](https://render.com/docs/workflows-defining). Nothing in that chain blocks the HTTP thread beyond streaming status updates back to the browser.
 
