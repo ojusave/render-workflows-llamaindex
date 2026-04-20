@@ -94,6 +94,24 @@ The web service accepts file uploads (or URLs), reads bytes from disk, and dispa
 
 **Logs**: web service and workflow task logs in the [Render Dashboard](https://dashboard.render.com).
 
+### Monorepo (optional)
+
+If this folder lives inside a monorepo (e.g. **Samples**), use the repository root [`render.yaml`](../render.yaml) for preview environments and multi-service deploy. This folder’s [`render.yaml`](render.yaml) is for **standalone** clones.
+
+### HTTP routes (reference)
+
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| GET | `/health` | — | `{ "status": "ok" }` |
+| GET | `/` | — | Static UI |
+| POST | `/upload` | multipart file | SSE pipeline |
+| POST | `/upload-url` | `{ "url" }` | SSE pipeline |
+| GET | `/documents` | — | JSON list |
+| GET | `/documents/:id` | — | JSON or 404 |
+| DELETE | `/documents/:id` | — | `{ "status": "ok" }` or 404 |
+| POST | `/search` | `{ "query" }` | JSON (needs `LLAMACLOUD_PIPELINE_ID`) |
+| POST | `/ask` | `{ "question" }` | JSON RAG-style answer |
+
 ## Project structure
 
 ```
@@ -137,7 +155,9 @@ Questions about Render, workflows, or troubleshooting a deploy: join the [Render
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md): issues, pull requests, validation, and **adding a document type** (classify rules + schemas).
+Open an issue or a focused PR; match `main.ts`, `pipeline/`, `tasks/`, `shared/`. Run `npm install && npm run build` before pushing.
+
+**Adding a document type:** (1) add a classification rule in [`tasks/classify.ts`](tasks/classify.ts); (2) add a matching JSON schema in [`tasks/schemas.ts`](tasks/schemas.ts). The extract task picks the schema from the classified type.
 
 ## License
 

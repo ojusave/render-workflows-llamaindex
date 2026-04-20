@@ -1,3 +1,7 @@
+# Standalone deploy for this repo. For the Samples monorepo, prefer /render.yaml at repository root.
+previews:
+  generation: automatic
+
 services:
   - type: web
     name: render-workflows-llamaindex
