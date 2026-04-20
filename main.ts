@@ -16,6 +16,7 @@ import {
   listDocuments,
   getDocument,
   deleteDocument,
+  purgeDocumentsOlderThan,
 } from "./shared/db.js";
 import { retrieveFromConfiguredPipeline } from "./shared/pipeline-retrieval.js";
 import { streamPipeline } from "./pipeline-stream.js";
@@ -33,6 +34,20 @@ const MAX_UPLOAD_BYTES = parseInt(
 );
 const UPLOAD_URL_FETCH_TIMEOUT_MS = parseInt(
   process.env.UPLOAD_URL_FETCH_TIMEOUT_MS || "120000",
+  10
+);
+
+/** Drop document rows older than this many minutes (0 = disable). Default 10 for demo hygiene. */
+const DOCUMENT_RETENTION_MINUTES = (() => {
+  const raw = process.env.DOCUMENT_RETENTION_MINUTES;
+  if (raw === undefined || raw === "") return 10;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : 10;
+})();
+
+/** How often to run retention purge (ms). Default 60s so expiry stays near the window. */
+const DOCUMENT_PURGE_INTERVAL_MS = parseInt(
+  process.env.DOCUMENT_PURGE_INTERVAL_MS || "60000",
   10
 );
 
@@ -191,6 +206,26 @@ const PORT = parseInt(process.env.PORT || "3000", 10);
 initDb()
   .then(() => {
     console.log("Database initialized");
+    if (DOCUMENT_RETENTION_MINUTES > 0) {
+      const runPurge = () => {
+        purgeDocumentsOlderThan(DOCUMENT_RETENTION_MINUTES)
+          .then((n) => {
+            if (n > 0) {
+              console.log(
+                `Document retention: removed ${n} row(s) older than ${DOCUMENT_RETENTION_MINUTES} minutes`
+              );
+            }
+          })
+          .catch((err) => console.error("Document retention purge failed:", err));
+      };
+      runPurge();
+      setInterval(runPurge, DOCUMENT_PURGE_INTERVAL_MS);
+      console.log(
+        `Document retention: purge every ${DOCUMENT_PURGE_INTERVAL_MS}ms, keep rows newer than ${DOCUMENT_RETENTION_MINUTES} minutes`
+      );
+    } else {
+      console.log("Document retention: disabled (DOCUMENT_RETENTION_MINUTES=0)");
+    }
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });

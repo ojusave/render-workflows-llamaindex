@@ -134,6 +134,17 @@ export async function deleteDocument(id: number): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
+/** Deletes rows whose `created_at` is older than `retentionMinutes`. Returns rows removed. */
+export async function purgeDocumentsOlderThan(retentionMinutes: number): Promise<number> {
+  if (retentionMinutes <= 0) return 0;
+  const result = await pool.query(
+    `DELETE FROM documents
+     WHERE created_at < NOW() - ($1::integer * INTERVAL '1 minute')`,
+    [retentionMinutes]
+  );
+  return result.rowCount ?? 0;
+}
+
 export async function closeDb(): Promise<void> {
   await pool.end();
 }
