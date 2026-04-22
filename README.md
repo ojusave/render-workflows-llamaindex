@@ -40,7 +40,7 @@ This repo demonstrates how to build document AI applications using:
 
 ## Architecture
 
-![Architecture](static/images/architecture.png)
+![Architecture](static/images/architecture.svg)
 
 ### How It Works
 
