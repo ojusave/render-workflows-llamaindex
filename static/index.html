@@ -446,6 +446,7 @@
     // State
     let currentView = 'welcome';
     let pipelineRunning = false;
+    let currentPipelineDocId = null; // Track which document is being processed
 
     function showView(view) {
       currentView = view;
@@ -694,6 +695,10 @@
     function handleEvent(feed, resultSection, errorEl, event, data) {
       switch (event) {
         case 'status': {
+          // Capture document ID when pipeline starts
+          if (data.documentId) {
+            currentPipelineDocId = data.documentId;
+          }
           const labels = {
             uploading: '<strong>Render Workflows</strong> dispatched upload task: <strong>LlamaCloud Files</strong> is registering your document...',
             classifying: '<strong>Render Workflows</strong> dispatched classify task: <strong>LlamaCloud Classify</strong> is analyzing your document...',
@@ -728,6 +733,7 @@
         case 'done':
           addElapsedToLast(feed);
           stopTimer();
+          currentPipelineDocId = null;
           feed.querySelectorAll('.activity-item.active').forEach(el => {
             el.classList.remove('active');
             el.classList.add('done');
@@ -738,6 +744,7 @@
 
         case 'error':
           stopTimer();
+          currentPipelineDocId = null;
           feed.querySelectorAll('.activity-item.active').forEach(el => {
             el.classList.remove('active');
             el.classList.add('error');
@@ -802,6 +809,11 @@
     }
 
     async function showDocument(id) {
+      // If clicking on the document currently being processed, show pipeline view
+      if (pipelineRunning && currentPipelineDocId === id) {
+        showView('pipeline');
+        return;
+      }
       if (pipelineRunning) return;
       showView('detail');
       const container = document.getElementById('detail-view');
