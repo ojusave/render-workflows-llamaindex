@@ -137,7 +137,7 @@ When this value is present:
 6. If `LLAMACLOUD_PIPELINE_ID` is configured, use **Search** and **Ask** against indexed documents.
 
 > [!NOTE]
-> **Ephemeral sessions**: Each visitor gets a unique session that expires after 15 minutes (configurable via `SESSION_LIFETIME_MINUTES`). When a session expires, all uploaded documents are automatically deleted. This ensures the demo doesn't store anyone's data permanently and keeps each user's data isolated.
+> **Ephemeral sessions**: Each visitor gets a unique session that expires after 15 minutes (configurable via `SESSION_LIFETIME_MINUTES`). When a session expires, all uploaded documents are automatically deleted. This ensures the demo doesn't store anyone's data permanently and keeps each user's data isolated. Sessions are automatically extended when you upload a document, so you don't need to worry about expiry during processing.
 
 > [!TIP]
 > `Ask` currently retrieves and formats relevant passages from the LlamaCloud pipeline. It does not call a separate answer-generation model yet.
