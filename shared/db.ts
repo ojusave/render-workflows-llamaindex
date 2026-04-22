@@ -72,9 +72,19 @@ export async function initDb(): Promise<void> {
     await client.query(`
       ALTER TABLE documents ADD COLUMN IF NOT EXISTS llamacloud_file_id TEXT
     `);
-    await client.query(`
-      ALTER TABLE documents ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES sessions(id) ON DELETE CASCADE
+    // Add session_id column if missing (without FK first, then add FK)
+    const hasSessionId = await client.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'documents' AND column_name = 'session_id'
     `);
+    if (hasSessionId.rows.length === 0) {
+      await client.query(`ALTER TABLE documents ADD COLUMN session_id INTEGER`);
+      await client.query(`
+        ALTER TABLE documents 
+        ADD CONSTRAINT fk_documents_session 
+        FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+      `);
+    }
   } finally {
     client.release();
   }
