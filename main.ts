@@ -22,6 +22,7 @@ import {
   createSession,
   getSessionByToken,
   purgeExpiredSessions,
+  purgeOrphanedDocuments,
   extendSession,
   SESSION_LIFETIME_MINUTES,
   type Session,
@@ -273,14 +274,19 @@ initDb()
     console.log("Database initialized");
 
     // Session purge: delete expired sessions (CASCADE deletes their documents)
-    const runPurge = () => {
-      purgeExpiredSessions()
-        .then((n) => {
-          if (n > 0) {
-            console.log(`Session cleanup: removed ${n} expired session(s) and their documents`);
-          }
-        })
-        .catch((err) => console.error("Session purge failed:", err));
+    const runPurge = async () => {
+      try {
+        const sessionsRemoved = await purgeExpiredSessions();
+        if (sessionsRemoved > 0) {
+          console.log(`Session cleanup: removed ${sessionsRemoved} expired session(s) and their documents`);
+        }
+        const orphansRemoved = await purgeOrphanedDocuments();
+        if (orphansRemoved > 0) {
+          console.log(`Session cleanup: removed ${orphansRemoved} orphaned document(s)`);
+        }
+      } catch (err) {
+        console.error("Session purge failed:", err);
+      }
     };
     runPurge();
     setInterval(runPurge, SESSION_PURGE_INTERVAL_MS);

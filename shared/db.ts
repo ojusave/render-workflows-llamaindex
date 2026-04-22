@@ -122,6 +122,16 @@ export async function purgeExpiredSessions(): Promise<number> {
   return result.rowCount ?? 0;
 }
 
+/** Delete orphaned documents (those with NULL session_id or non-existent session). */
+export async function purgeOrphanedDocuments(): Promise<number> {
+  const result = await pool.query(
+    `DELETE FROM documents 
+     WHERE session_id IS NULL 
+        OR session_id NOT IN (SELECT id FROM sessions)`
+  );
+  return result.rowCount ?? 0;
+}
+
 /** Extend a session's expiry by the given number of minutes from now. */
 export async function extendSession(sessionId: number, minutes: number): Promise<void> {
   await pool.query(
