@@ -22,9 +22,13 @@ import {
   createSession,
   getSessionByToken,
   purgeExpiredSessions,
+  extendSession,
   SESSION_LIFETIME_MINUTES,
   type Session,
 } from "./shared/db.js";
+
+/** Minimum session time (in minutes) to ensure pipeline can complete. */
+const MIN_SESSION_TIME_FOR_UPLOAD = 10;
 import { retrieveFromConfiguredPipeline } from "./shared/pipeline-retrieval.js";
 import { streamPipeline } from "./pipeline-stream.js";
 import { filenameWithExtFromContentType } from "./shared/filename-ext.js";
@@ -126,6 +130,8 @@ app.post("/s/:token/upload", requireSession, upload.single("file"), async (req, 
     res.status(400).json({ error: "No file provided" });
     return;
   }
+  // Extend session to ensure pipeline has time to complete
+  await extendSession(req.session!.id, MIN_SESSION_TIME_FOR_UPLOAD);
   const filename = file.originalname || "document";
   const documentId = await insertDocument(req.session!.id, filename);
   await streamPipeline(res, documentId, file.path, filename);
@@ -166,6 +172,8 @@ app.post("/s/:token/upload-url", requireSession, async (req, res) => {
     return;
   }
 
+  // Extend session to ensure pipeline has time to complete
+  await extendSession(req.session!.id, MIN_SESSION_TIME_FOR_UPLOAD);
   const documentId = await insertDocument(req.session!.id, filename);
   await streamPipeline(res, documentId, tempPath, filename);
 });

@@ -555,6 +555,7 @@
       pipelineRunning = false;
       stopTimer();
       loadDocuments();
+      loadSessionInfo(); // Refresh session timer (may have been extended)
     }
 
     // Timer
@@ -657,6 +658,7 @@
       pipelineRunning = false;
       stopTimer();
       loadDocuments();
+      loadSessionInfo(); // Refresh session timer (may have been extended)
     }
 
     function addActivity(feed, text, state) {

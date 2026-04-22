@@ -122,6 +122,14 @@ export async function purgeExpiredSessions(): Promise<number> {
   return result.rowCount ?? 0;
 }
 
+/** Extend a session's expiry by the given number of minutes from now. */
+export async function extendSession(sessionId: number, minutes: number): Promise<void> {
+  await pool.query(
+    `UPDATE sessions SET expires_at = NOW() + ($2::integer * INTERVAL '1 minute') WHERE id = $1`,
+    [sessionId, minutes]
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Document operations (session-scoped)
 // ─────────────────────────────────────────────────────────────────────────────
