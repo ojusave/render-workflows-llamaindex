@@ -137,24 +137,31 @@ When this value is present:
 6. If `LLAMACLOUD_PIPELINE_ID` is configured, use **Search** and **Ask** against indexed documents.
 
 > [!NOTE]
-> **Ephemeral sessions**: Each visitor gets a unique session that expires after 15 minutes (configurable via `SESSION_LIFETIME_MINUTES`). When a session expires, all uploaded documents are automatically deleted. This ensures the demo doesn't store anyone's data permanently and keeps each user's data isolated. Sessions are automatically extended when you upload a document, so you don't need to worry about expiry during processing.
+> **Ephemeral sessions**: Each visitor gets a unique session that expires after 15 minutes (configurable via `SESSION_LIFETIME_MINUTES`). When a session expires, all uploaded documents are automatically deleted from Postgres. This keeps each user's data isolated. Sessions are automatically extended when you upload a document, so you don't need to worry about expiry during processing.
+
+> [!WARNING]
+> **Privacy notice**: If `LLAMACLOUD_PIPELINE_ID` is set, parsed document text is indexed in LlamaCloud for Search/Ask functionality. This indexed data **persists beyond session expiry**. For public demos, consider disabling `LLAMACLOUD_PIPELINE_ID` or warning users not to upload sensitive documents.
 
 > [!TIP]
 > `Ask` currently retrieves and formats relevant passages from the LlamaCloud pipeline. It does not call a separate answer-generation model yet.
 
 ## HTTP surface
 
+All document routes are session-scoped under `/s/{token}/`.
+
 | Method | Path | Body | Response |
 | --- | --- | --- | --- |
 | `GET` | `/health` | - | `{ "status": "ok" }` |
-| `GET` | `/` | - | Static UI |
-| `POST` | `/upload` | multipart file | SSE pipeline |
-| `POST` | `/upload-url` | `{ "url" }` | SSE pipeline |
-| `GET` | `/documents` | - | JSON list |
-| `GET` | `/documents/:id` | - | JSON or `404` |
-| `DELETE` | `/documents/:id` | - | `{ "status": "ok" }` or `404` |
-| `POST` | `/search` | `{ "query" }` | JSON results, requires `LLAMACLOUD_PIPELINE_ID` |
-| `POST` | `/ask` | `{ "question" }` | JSON answer plus passages, requires `LLAMACLOUD_PIPELINE_ID` |
+| `GET` | `/` | - | Creates session, redirects to `/s/{token}` |
+| `GET` | `/s/{token}` | - | Serves UI for valid session |
+| `GET` | `/s/{token}/session` | - | Session info (expiry, lifetime) |
+| `POST` | `/s/{token}/upload` | multipart file | SSE pipeline |
+| `POST` | `/s/{token}/upload-url` | `{ "url" }` | SSE pipeline |
+| `GET` | `/s/{token}/documents` | - | JSON list (session-scoped) |
+| `GET` | `/s/{token}/documents/:id` | - | JSON or `404` |
+| `DELETE` | `/s/{token}/documents/:id` | - | `{ "status": "ok" }` or `404` |
+| `POST` | `/s/{token}/search` | `{ "query" }` | JSON results, requires `LLAMACLOUD_PIPELINE_ID` |
+| `POST` | `/s/{token}/ask` | `{ "question" }` | JSON answer plus passages, requires `LLAMACLOUD_PIPELINE_ID` |
 
 ## Monorepo note
 
