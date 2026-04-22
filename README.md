@@ -2,226 +2,167 @@
 
 # Document Intelligence Pipeline
 
-Render Workflows is the center of this document pipeline. A thin Express service handles uploads and live progress, while workflow tasks call LlamaIndex-powered LlamaCloud APIs, store results in Postgres, and can optionally index parsed text for search and Ask.
+A production-ready document AI pipeline combining **Render Workflows** for orchestration and **LlamaCloud** for intelligent document processing. Upload any document and watch it get classified, parsed, and structured in real-time.
 
 <p>
   <a href="https://render.com/deploy?repo=https://github.com/ojusave/render-workflows-llamaindex">
     <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" />
   </a>
-  <a href="https://discord.gg/gvC7ceS9YS">
-    <img src="https://img.shields.io/badge/Discord-Render%20Developers-5865F2?logo=discord&logoColor=white" alt="Discord: Render Developers" />
-  </a>
 </p>
 
 <p>
-  <strong>Render Workflows</strong> · <strong>LlamaIndex / LlamaCloud</strong> · <strong>Postgres</strong> · <strong>Optional Search / Ask</strong>
+  <a href="https://render.com">
+    <img src="https://img.shields.io/badge/Render-Workflows-6c63ff?logo=render&logoColor=white" alt="Render Workflows" />
+  </a>
+  <a href="https://cloud.llamaindex.ai">
+    <img src="https://img.shields.io/badge/LlamaCloud-Document%20AI-ff6b6b?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0wIDE4Yy00LjQxIDAtOC0zLjU5LTgtOHMzLjU5LTggOC04IDggMy41OSA4IDgtMy41OSA4LTggOHoiLz48L3N2Zz4=&logoColor=white" alt="LlamaCloud" />
+  </a>
+  <a href="https://discord.gg/gvC7ceS9YS">
+    <img src="https://img.shields.io/badge/Discord-Render%20Developers-5865F2?logo=discord&logoColor=white" alt="Discord" />
+  </a>
+  <a href="https://discord.com/invite/dGcwcsnxhU">
+    <img src="https://img.shields.io/badge/Discord-LlamaIndex-5865F2?logo=discord&logoColor=white" alt="LlamaIndex Discord" />
+  </a>
 </p>
 
 </div>
 
-## Why this example exists
+## What This Demo Shows
 
-This repo is a Render Workflows-first reference layout for document AI on Render:
+This repo demonstrates how to build document AI applications using:
 
-- uploads and URL downloads land in a lightweight Express web service
-- heavy LlamaIndex cloud work runs in separate Render Workflow tasks
-- extracted rows are stored in Postgres
-- indexed search and Ask are enabled when `LLAMACLOUD_PIPELINE_ID` is set
-
-It is a good fit for teams already on Render who want a working LlamaCloud integration and a clear place to extend document types, schemas, and retrieval behavior.
-
-## What you get
-
-| Capability | What it means |
+| Platform | Role |
 | --- | --- |
-| Render Workflows at the center | The HTTP tier accepts uploads and streams status while Render Workflows handles the expensive classify, parse, extract, and store steps. |
-| Live progress | The UI consumes Server-Sent Events so each pipeline stage appears as it finishes. |
-| Optional semantic retrieval | Set `LLAMACLOUD_PIPELINE_ID` to enable Search and Ask with LlamaCloud retrieval. |
-| Blueprint-friendly | [`render.yaml`](render.yaml) creates the web service and Postgres database. The workflow service is created manually in the Render dashboard. |
+| **[Render Workflows](https://render.com/docs/workflows)** | Orchestrates long-running document processing tasks with automatic retries, timeouts, and monitoring |
+| **[LlamaCloud](https://cloud.llamaindex.ai)** | Provides the AI-powered document intelligence: classification, parsing, and structured extraction |
+| **[Render Postgres](https://render.com/docs/databases)** | Stores processed documents and extracted data |
+| **[Render Web Services](https://render.com/docs/web-services)** | Hosts the Express API and serves the real-time UI |
 
 ## Architecture
 
 ![Architecture](static/images/architecture.png)
 
-The Express API accepts uploads, streams progress via SSE, and dispatches work to Render Workflows. Each workflow task calls the corresponding LlamaCloud API (Files, Classify, LlamaParse, LlamaExtract) and stores results in Postgres.
+### How It Works
 
-### Workflow stages
+1. **Browser** uploads a document to the **Express API** on Render
+2. **Express** streams progress via SSE and dispatches work to **Render Workflows**
+3. **Render Workflows** executes five tasks, each calling a **LlamaCloud API**:
 
-| Stage | Service | Output |
+| Render Workflow Task | LlamaCloud API | What It Does |
 | --- | --- | --- |
-| Upload | LlamaCloud Files | Registers the uploaded file and returns a `file_id` |
-| Classify | LlamaCloud Classify | Resolves document type and confidence |
-| Parse | LlamaParse agentic tier | Produces clean markdown and raw text |
-| Extract | LlamaExtract | Produces structured fields from the classified schema |
-| Store | Postgres + optional LlamaCloud pipeline | Persists document rows and optionally indexes parsed text for retrieval |
+| `upload_to_llamacloud` | [Files API](https://docs.cloud.llamaindex.ai/llamacloud/api/files) | Registers the document and returns a `file_id` |
+| `classify_document` | [Classify API](https://docs.cloud.llamaindex.ai/llamacloud/api/classify) | Identifies document type (invoice, contract, form, etc.) |
+| `parse_document` | [LlamaParse](https://docs.cloud.llamaindex.ai/llamaparse/getting_started) | Extracts clean markdown and text from 130+ file formats |
+| `extract_fields` | [LlamaExtract](https://docs.cloud.llamaindex.ai/llamacloud/api/extract) | Pulls structured fields based on document type |
+| `store_results` | — | Saves everything to Render Postgres |
 
-## Deploy to Render
+4. Results stream back to the browser in real-time
 
-### 1. Web service and database via Blueprint
+## Quick Start
 
-Click **Deploy to Render** above, or create a [Blueprint](https://render.com/docs/infrastructure-as-code) from this repository. [`render.yaml`](render.yaml) provisions:
+### Prerequisites
 
-- a web service
-- a Postgres database
-- automatic `DATABASE_URL` injection into the web service
+- [Render account](https://render.com/register) (free tier works)
+- [LlamaCloud account](https://cloud.llamaindex.ai) (free tier available)
 
-You will be prompted for:
+### Deploy
 
-- `RENDER_API_KEY`
-- `LLAMA_CLOUD_API_KEY`
+1. Click **Deploy to Render** above
+2. You'll be prompted for:
+   - `RENDER_API_KEY` — [Get one here](https://render.com/docs/api#1-create-an-api-key)
+   - `LLAMA_CLOUD_API_KEY` — [Get one here](https://cloud.llamaindex.ai)
 
-### 2. Workflow service in the Render dashboard
+3. Create the Workflow service manually:
+   - Go to [Render Dashboard](https://dashboard.render.com) → **New** → **Workflow**
+   - Connect this repository
+   - Build command: `npm install && npm run build`
+   - Start command: `node dist/tasks/index.js`
+   - Name: `render-workflows-llamaindex-workflow`
+   - Add env vars: `LLAMA_CLOUD_API_KEY`, `DATABASE_URL` (from your Postgres)
 
-1. Open [Render Dashboard](https://dashboard.render.com) -> **New** -> **Workflow**
-2. Connect this repository
-3. Set build command to:
+4. Open your web service URL and upload a document!
 
-   ```bash
-   npm install && npm run build
-   ```
+## Features
 
-4. Set start command to:
-
-   ```bash
-   node dist/tasks/index.js
-   ```
-
-5. Name the service `render-workflows-llamaindex-workflow`
-6. Add these environment variables:
-   - `LLAMA_CLOUD_API_KEY`
-   - `LLAMACLOUD_PIPELINE_ID`
-   - `DATABASE_URL` using the Postgres [Internal URL](https://render.com/docs/databases#connecting-from-within-render)
-
-> [!IMPORTANT]
-> The workflow service name must exactly match `WORKFLOW_SLUG`.
-
-### 3. Enable semantic search and Ask (optional)
-
-Create a pipeline in the [LlamaCloud UI](https://cloud.llamaindex.ai) at **Index -> Create Pipeline**. Copy the pipeline ID and set `LLAMACLOUD_PIPELINE_ID` on both the web service and the workflow service.
-
-When this value is present:
-
-- uploaded documents are indexed automatically
-- **Search** uses LlamaCloud retrieval
-- **Ask** returns retrieved passages formatted for the UI
+| Feature | Description |
+| --- | --- |
+| **Real-time progress** | Watch each pipeline stage complete via Server-Sent Events |
+| **130+ file formats** | LlamaParse handles PDF, DOCX, XLSX, images, HTML, and more |
+| **Smart classification** | LlamaCloud Classify identifies document types automatically |
+| **Structured extraction** | LlamaExtract pulls typed fields based on document type |
+| **Ephemeral sessions** | Each user gets isolated data that auto-deletes (configurable) |
+| **Optional search** | Enable semantic search with a LlamaCloud pipeline |
 
 ## Configuration
 
-| Variable | Where | Default | Description |
-| --- | --- | --- | --- |
-| `RENDER_API_KEY` | Web service | required | [Render API key](https://render.com/docs/api#1-create-an-api-key) used to dispatch workflow tasks |
-| `LLAMA_CLOUD_API_KEY` | Both | required | [LlamaCloud API key](https://cloud.llamaindex.ai) |
-| `DATABASE_URL` | Both | required | Postgres [Internal URL](https://render.com/docs/databases#connecting-from-within-render). Auto-injected on the web service by the Blueprint. |
-| `LLAMACLOUD_PIPELINE_ID` | Both | optional | [LlamaCloud pipeline](https://cloud.llamaindex.ai) ID for semantic search and Ask retrieval |
-| `WORKFLOW_SLUG` | Web service | `render-workflows-llamaindex-workflow` | Must match the workflow service name exactly |
-| `MAX_UPLOAD_BYTES` | Web service | `104857600` | Max file size in bytes for uploads, URL downloads, and the first workflow dispatch payload |
-| `SESSION_LIFETIME_MINUTES` | Web service | `15` | Ephemeral session lifetime. Sessions and their documents are automatically deleted after this many minutes. |
-| `SESSION_PURGE_INTERVAL_MS` | Web service | `60000` | How often the web process runs session cleanup |
-| `PORT` | Web service | `3000` | [Set automatically by Render](https://render.com/docs/environment-variables#all-runtimes) |
+| Variable | Where | Description |
+| --- | --- | --- |
+| `RENDER_API_KEY` | Web service | [Render API key](https://render.com/docs/api#1-create-an-api-key) for dispatching workflow tasks |
+| `LLAMA_CLOUD_API_KEY` | Both services | [LlamaCloud API key](https://cloud.llamaindex.ai) for document AI |
+| `DATABASE_URL` | Both services | Render Postgres connection string |
+| `LLAMACLOUD_PIPELINE_ID` | Both (optional) | Enable [semantic search](https://docs.cloud.llamaindex.ai/llamacloud/guides/pipelines) |
+| `SESSION_LIFETIME_MINUTES` | Web service | Session duration before cleanup (default: 15) |
 
-## Use it after deploy
-
-1. Open the web service URL from the Render dashboard.
-2. You'll be redirected to a unique session URL (`/s/{token}`).
-3. Upload a file or paste a document URL.
-4. Watch the activity stream as each pipeline stage completes.
-5. Open the **Documents** list to inspect parsed content and structured output.
-6. If `LLAMACLOUD_PIPELINE_ID` is configured, use **Search** and **Ask** against indexed documents.
-
-> [!NOTE]
-> **Ephemeral sessions**: Each visitor gets a unique session that expires after 15 minutes (configurable via `SESSION_LIFETIME_MINUTES`). When a session expires, all uploaded documents are automatically deleted from Postgres. This keeps each user's data isolated. Sessions are automatically extended when you upload a document, so you don't need to worry about expiry during processing.
+## Privacy & Demo Mode
 
 > [!WARNING]
-> **Privacy notice**: If `LLAMACLOUD_PIPELINE_ID` is set, parsed document text is indexed in LlamaCloud for Search/Ask functionality. This indexed data **persists beyond session expiry**. For public demos, consider disabling `LLAMACLOUD_PIPELINE_ID` or warning users not to upload sensitive documents.
+> **For public demos**: This app includes a prominent warning against uploading sensitive documents. Session data is deleted from Postgres on expiry, but if `LLAMACLOUD_PIPELINE_ID` is set, indexed text persists in LlamaCloud.
 
-> [!TIP]
-> `Ask` currently retrieves and formats relevant passages from the LlamaCloud pipeline. It does not call a separate answer-generation model yet.
+To run as a privacy-safe demo:
+- Leave `LLAMACLOUD_PIPELINE_ID` empty (disables Search/Ask, but classify/parse/extract still work)
+- Or create a LlamaCloud pipeline you periodically clear
 
-## HTTP surface
+## Project Structure
 
-All document routes are session-scoped under `/s/{token}/`.
-
-| Method | Path | Body | Response |
-| --- | --- | --- | --- |
-| `GET` | `/health` | - | `{ "status": "ok" }` |
-| `GET` | `/` | - | Creates session, redirects to `/s/{token}` |
-| `GET` | `/s/{token}` | - | Serves UI for valid session |
-| `GET` | `/s/{token}/session` | - | Session info (expiry, lifetime) |
-| `POST` | `/s/{token}/upload` | multipart file | SSE pipeline |
-| `POST` | `/s/{token}/upload-url` | `{ "url" }` | SSE pipeline |
-| `GET` | `/s/{token}/documents` | - | JSON list (session-scoped) |
-| `GET` | `/s/{token}/documents/:id` | - | JSON or `404` |
-| `DELETE` | `/s/{token}/documents/:id` | - | `{ "status": "ok" }` or `404` |
-| `POST` | `/s/{token}/search` | `{ "query" }` | JSON results, requires `LLAMACLOUD_PIPELINE_ID` |
-| `POST` | `/s/{token}/ask` | `{ "question" }` | JSON answer plus passages, requires `LLAMACLOUD_PIPELINE_ID` |
-
-## Monorepo note
-
-If this folder lives inside a monorepo such as **Samples**, use the repository root [`render.yaml`](../render.yaml) for preview environments and multi-service deploys. This folder's [`render.yaml`](render.yaml) is for standalone clones.
-
-## Project structure
-
-```text
-main.ts                      Express web server: upload, search, ask, documents
-pipeline/orchestrator.ts     Dispatch tasks, poll, stream SSE
+```
+main.ts                      Express API + SSE streaming
+pipeline/orchestrator.ts     Dispatches Render Workflow tasks
 tasks/
-  index.ts                   Workflow entry point
-  upload.ts                  LlamaCloud Files API (register upload)
-  classify.ts                LlamaCloud Classify API
-  parse.ts                   LlamaParse agentic tier
-  extract.ts                 LlamaExtract with auto-schema
-  schemas.ts                 JSON Schemas per document type
-  store.ts                   Postgres writes + LlamaCloud pipeline indexing
+  upload.ts                  → LlamaCloud Files API
+  classify.ts                → LlamaCloud Classify API
+  parse.ts                   → LlamaParse
+  extract.ts                 → LlamaExtract
+  store.ts                   → Render Postgres
 shared/
-  db.ts                      Postgres pool, schema init, queries
-  llama-client.ts            Shared LlamaCloud client singleton
-  pipeline-retrieval.ts      Search and Ask retrieval adapters
-static/index.html            Frontend UI
+  db.ts                      Postgres queries
+  llama-client.ts            LlamaCloud SDK client
 render.yaml                  Render Blueprint
 ```
 
+## API Routes
+
+All document routes are session-scoped under `/s/{token}/`.
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/` | Creates session, redirects to `/s/{token}` |
+| `POST` | `/s/{token}/upload` | Upload file, returns SSE progress stream |
+| `POST` | `/s/{token}/upload-url` | Fetch from URL, returns SSE progress stream |
+| `GET` | `/s/{token}/documents` | List documents in session |
+| `POST` | `/s/{token}/search` | Semantic search (requires `LLAMACLOUD_PIPELINE_ID`) |
+| `POST` | `/s/{token}/ask` | RAG retrieval (requires `LLAMACLOUD_PIPELINE_ID`) |
+
 ## Troubleshooting
 
-**Workflow tasks fail immediately**  
-`WORKFLOW_SLUG` on the web service must exactly match the workflow service name.
+| Problem | Solution |
+| --- | --- |
+| Workflow tasks fail immediately | Ensure `WORKFLOW_SLUG` matches your workflow service name exactly |
+| Database connection errors | Use the Postgres **Internal URL**, not External |
+| Search returns "not configured" | Set `LLAMACLOUD_PIPELINE_ID` on both services |
+| "Unsupported file type" | Ensure filename has a valid extension (`.pdf`, `.docx`, etc.) |
+| LlamaCloud rate limits | Tasks retry automatically; check your [LlamaCloud dashboard](https://cloud.llamaindex.ai) |
 
-**Database connection errors**  
-Use the Postgres [Internal URL](https://render.com/docs/databases#connecting-from-within-render), not the External URL.
+## Learn More
 
-**Search returns "not configured"**  
-Set `LLAMACLOUD_PIPELINE_ID` on both the web service and the workflow service.
+**Render:**
+- [Render Workflows Documentation](https://render.com/docs/workflows)
+- [Render Developers Discord](https://discord.gg/gvC7ceS9YS)
 
-**Search and Ask behave differently across pipeline types**  
-LlamaCloud distinguishes **MANAGED** and **PLAYGROUND** pipelines. The app uses `pipelines.retrieve` for managed pipelines and `retrievers.search` for playground pipelines so both work with the same `LLAMACLOUD_PIPELINE_ID`.
-
-**Download or upload is "too large"**  
-The default max is **100 MB** per file. Increase `MAX_UPLOAD_BYTES` if needed, but remember that the first workflow task receives base64-encoded bytes, so very large files increase memory use.
-
-**`Unsupported file type: None` from LlamaCloud**  
-The upload task must write a file with a real extension such as `.pdf`, not `.bin`. The workflow infers extensions from the filename, `Content-Type`, or a few magic-byte signatures.
-
-**LlamaCloud rate limits**  
-Tasks retry automatically with exponential backoff. Check your [usage dashboard](https://cloud.llamaindex.ai) if you keep seeing retries or failures.
-
-## Contributing
-
-Open an issue or a focused PR. If you add a document type:
-
-1. add a classification rule in [`tasks/classify.ts`](tasks/classify.ts)
-2. add the matching JSON schema in [`tasks/schemas.ts`](tasks/schemas.ts)
-
-The extract task selects the schema from the classified type.
-
-Before pushing changes, run:
-
-```bash
-npm install && npm run build
-```
-
-## Community
-
-Questions about Render, workflows, or deployment troubleshooting: join the [Render Developers Discord](https://discord.gg/gvC7ceS9YS).
+**LlamaIndex:**
+- [LlamaCloud Documentation](https://docs.cloud.llamaindex.ai)
+- [LlamaParse Documentation](https://docs.cloud.llamaindex.ai/llamaparse/getting_started)
+- [LlamaIndex Discord](https://discord.com/invite/dGcwcsnxhU)
 
 ## License
 
-[MIT](LICENSE). Copyright (c) 2026 Ojusave.
+[MIT](LICENSE)
