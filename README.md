@@ -139,6 +139,8 @@ All document routes are session-scoped under `/s/{token}/`.
 | `POST` | `/s/{token}/upload` | Upload file, returns SSE progress stream |
 | `POST` | `/s/{token}/upload-url` | Fetch from URL, returns SSE progress stream |
 | `GET` | `/s/{token}/documents` | List documents in session |
+| `GET` | `/s/{token}/documents/:id` | Get single document details |
+| `DELETE` | `/s/{token}/documents/:id` | Delete a document |
 | `POST` | `/s/{token}/search` | Semantic search (requires `LLAMACLOUD_PIPELINE_ID`) |
 | `POST` | `/s/{token}/ask` | RAG retrieval (requires `LLAMACLOUD_PIPELINE_ID`) |
 
