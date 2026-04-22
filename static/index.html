@@ -289,7 +289,10 @@
         <div id="welcome" class="welcome">
           <h2>Document Intelligence</h2>
           <p>Upload any document and watch the pipeline classify it, parse its content, and extract structured data: all powered by LlamaCloud and orchestrated by Render Workflows.</p>
-          <p style="font-size:0.7rem;color:var(--amber);margin-bottom:0.5rem">This is a demo session. Uploaded documents are deleted when your session expires. If Search/Ask is enabled, parsed text may be retained in LlamaCloud. Do not upload sensitive documents.</p>
+          <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);padding:0.75rem 1rem;margin:0.75rem 0;text-align:left;max-width:480px">
+            <p style="font-size:0.75rem;color:var(--red);font-weight:600;margin-bottom:0.25rem">Do not upload sensitive or personal documents</p>
+            <p style="font-size:0.7rem;color:var(--text-muted);line-height:1.5;margin:0">This is a public demo. While session data is deleted on expiry, parsed text may be retained in LlamaCloud for search functionality. Use sample or test documents only.</p>
+          </div>
           <div class="drop-zone" id="drop-zone">
             <h3>Drop a file here</h3>
             <p>PDF, DOCX, XLSX, images, HTML, and 130+ more formats</p>
@@ -434,7 +437,7 @@
       main.innerHTML = `
         <div class="welcome">
           <h2>Session Expired</h2>
-          <p>Your demo session has expired and all uploaded documents have been deleted. This is a demo app that doesn't store any data permanently.</p>
+          <p>Your demo session has expired and uploaded documents have been deleted from the database.</p>
           <a href="/" class="header-btn primary" style="margin-top:1rem;display:inline-block">Start New Session</a>
         </div>
       `;
