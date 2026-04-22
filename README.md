@@ -2,7 +2,7 @@
 
 # Document Intelligence Pipeline
 
-Upload PDFs and other documents. An Express app dispatches LlamaIndex-powered LlamaCloud classify, parse, and extract tasks through Render Workflows, stores results in Postgres, and can optionally index parsed text for search and Ask.
+Render Workflows is the center of this document pipeline. A thin Express service handles uploads and live progress, while workflow tasks call LlamaIndex-powered LlamaCloud APIs, store results in Postgres, and can optionally index parsed text for search and Ask.
 
 <p>
   <a href="https://render.com/deploy?repo=https://github.com/ojusave/render-workflows-llamaindex">
@@ -21,7 +21,7 @@ Upload PDFs and other documents. An Express app dispatches LlamaIndex-powered Ll
 
 ## Why this example exists
 
-This repo is a reference layout for document AI on Render:
+This repo is a Render Workflows-first reference layout for document AI on Render:
 
 - uploads and URL downloads land in a lightweight Express web service
 - heavy LlamaIndex cloud work runs in separate Render Workflow tasks
@@ -34,7 +34,7 @@ It is a good fit for teams already on Render who want a working LlamaCloud integ
 
 | Capability | What it means |
 | --- | --- |
-| Thin web service, heavy workflow | The HTTP tier accepts uploads and streams status while Render Workflows handles the expensive classify, parse, extract, and store steps. |
+| Render Workflows at the center | The HTTP tier accepts uploads and streams status while Render Workflows handles the expensive classify, parse, extract, and store steps. |
 | Live progress | The UI consumes Server-Sent Events so each pipeline stage appears as it finishes. |
 | Optional semantic retrieval | Set `LLAMACLOUD_PIPELINE_ID` to enable Search and Ask with LlamaCloud retrieval. |
 | Blueprint-friendly | [`render.yaml`](render.yaml) creates the web service and Postgres database. The workflow service is created manually in the Render dashboard. |
