@@ -64,14 +64,12 @@ export async function initDb(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_documents_status
       ON documents (status)
     `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_documents_session_id
-      ON documents (session_id)
-    `);
+    
     // Existing DBs from before these columns existed
     await client.query(`
       ALTER TABLE documents ADD COLUMN IF NOT EXISTS llamacloud_file_id TEXT
     `);
+    
     // Add session_id column if missing (without FK first, then add FK)
     const hasSessionId = await client.query(`
       SELECT column_name FROM information_schema.columns 
@@ -85,6 +83,12 @@ export async function initDb(): Promise<void> {
         FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
       `);
     }
+    
+    // Index on session_id (must run AFTER the column is added)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_documents_session_id
+      ON documents (session_id)
+    `);
   } finally {
     client.release();
   }
