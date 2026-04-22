@@ -37,9 +37,9 @@ services:
         fromDatabase:
           name: llamaindex-docs-db
           property: connectionString
-      - key: DOCUMENT_RETENTION_MINUTES
-        value: "10"
-        description: "Delete Postgres document rows older than this many minutes (0 = keep all)."
+      - key: SESSION_LIFETIME_MINUTES
+        value: "15"
+        description: "Ephemeral session lifetime in minutes. Sessions and their documents are deleted after expiry."
         required: false
         sync: false
 

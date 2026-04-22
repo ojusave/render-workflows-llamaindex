@@ -2,9 +2,13 @@
  * Postgres connection pool and all database operations.
  * Stores document metadata, parsed content, and extracted fields.
  * Semantic search handled by LlamaCloud managed pipelines (not pgvector).
+ *
+ * Sessions: Each visitor gets an ephemeral session with isolated data.
+ * Sessions and their documents auto-expire after SESSION_LIFETIME_MINUTES.
  */
 
 import pg from "pg";
+import crypto from "crypto";
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
@@ -13,12 +17,36 @@ const pool = new pg.Pool({
     : { rejectUnauthorized: false },
 });
 
+/** Session lifetime in minutes (default 15 for demo). */
+export const SESSION_LIFETIME_MINUTES = parseInt(
+  process.env.SESSION_LIFETIME_MINUTES || "15",
+  10
+);
+
 export async function initDb(): Promise<void> {
   const client = await pool.connect();
   try {
+    // Sessions table for ephemeral demo access
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id            SERIAL PRIMARY KEY,
+        token         TEXT NOT NULL UNIQUE,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        expires_at    TIMESTAMPTZ NOT NULL
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions (token)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions (expires_at)
+    `);
+
+    // Documents table with session_id foreign key
     await client.query(`
       CREATE TABLE IF NOT EXISTS documents (
         id            SERIAL PRIMARY KEY,
+        session_id    INTEGER REFERENCES sessions(id) ON DELETE CASCADE,
         filename      TEXT NOT NULL,
         doc_type      TEXT,
         confidence    REAL,
@@ -36,19 +64,72 @@ export async function initDb(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_documents_status
       ON documents (status)
     `);
-    // Existing DBs from before this column existed: CREATE TABLE IF NOT EXISTS does not add columns.
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_documents_session_id
+      ON documents (session_id)
+    `);
+    // Existing DBs from before these columns existed
     await client.query(`
       ALTER TABLE documents ADD COLUMN IF NOT EXISTS llamacloud_file_id TEXT
+    `);
+    await client.query(`
+      ALTER TABLE documents ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES sessions(id) ON DELETE CASCADE
     `);
   } finally {
     client.release();
   }
 }
 
-export async function insertDocument(filename: string): Promise<number> {
+// ─────────────────────────────────────────────────────────────────────────────
+// Session operations
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface Session {
+  id: number;
+  token: string;
+  created_at: Date;
+  expires_at: Date;
+}
+
+/** Create a new ephemeral session, returns the token. */
+export async function createSession(): Promise<Session> {
+  const token = crypto.randomUUID();
   const result = await pool.query(
-    "INSERT INTO documents (filename) VALUES ($1) RETURNING id",
-    [filename]
+    `INSERT INTO sessions (token, expires_at)
+     VALUES ($1, NOW() + ($2::integer * INTERVAL '1 minute'))
+     RETURNING id, token, created_at, expires_at`,
+    [token, SESSION_LIFETIME_MINUTES]
+  );
+  return result.rows[0];
+}
+
+/** Get session by token, returns null if not found or expired. */
+export async function getSessionByToken(token: string): Promise<Session | null> {
+  const result = await pool.query(
+    `SELECT id, token, created_at, expires_at
+     FROM sessions
+     WHERE token = $1 AND expires_at > NOW()`,
+    [token]
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Delete expired sessions (CASCADE deletes their documents). */
+export async function purgeExpiredSessions(): Promise<number> {
+  const result = await pool.query(
+    `DELETE FROM sessions WHERE expires_at < NOW()`
+  );
+  return result.rowCount ?? 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Document operations (session-scoped)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function insertDocument(sessionId: number, filename: string): Promise<number> {
+  const result = await pool.query(
+    "INSERT INTO documents (session_id, filename) VALUES ($1, $2) RETURNING id",
+    [sessionId, filename]
   );
   return result.rows[0].id;
 }
@@ -106,7 +187,7 @@ export async function updateDocumentError(
   );
 }
 
-export async function listDocuments(): Promise<
+export async function listDocuments(sessionId: number): Promise<
   Array<{
     id: number;
     filename: string;
@@ -119,30 +200,26 @@ export async function listDocuments(): Promise<
 > {
   const result = await pool.query(
     `SELECT id, filename, doc_type, confidence, status, structured_data, created_at
-     FROM documents ORDER BY created_at DESC`
+     FROM documents WHERE session_id = $1 ORDER BY created_at DESC`,
+    [sessionId]
   );
   return result.rows;
 }
 
-export async function getDocument(id: number) {
-  const result = await pool.query("SELECT * FROM documents WHERE id = $1", [id]);
+export async function getDocument(sessionId: number, id: number) {
+  const result = await pool.query(
+    "SELECT * FROM documents WHERE id = $1 AND session_id = $2",
+    [id, sessionId]
+  );
   return result.rows[0] ?? null;
 }
 
-export async function deleteDocument(id: number): Promise<boolean> {
-  const result = await pool.query("DELETE FROM documents WHERE id = $1", [id]);
-  return (result.rowCount ?? 0) > 0;
-}
-
-/** Deletes rows whose `created_at` is older than `retentionMinutes`. Returns rows removed. */
-export async function purgeDocumentsOlderThan(retentionMinutes: number): Promise<number> {
-  if (retentionMinutes <= 0) return 0;
+export async function deleteDocument(sessionId: number, id: number): Promise<boolean> {
   const result = await pool.query(
-    `DELETE FROM documents
-     WHERE created_at < NOW() - ($1::integer * INTERVAL '1 minute')`,
-    [retentionMinutes]
+    "DELETE FROM documents WHERE id = $1 AND session_id = $2",
+    [id, sessionId]
   );
-  return result.rowCount ?? 0;
+  return (result.rowCount ?? 0) > 0;
 }
 
 export async function closeDb(): Promise<void> {

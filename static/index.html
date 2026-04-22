@@ -81,6 +81,8 @@
     header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,0.4); flex-shrink: 0; }
     header h1 { font-size: 0.875rem; font-weight: 600; font-family: 'Inter', sans-serif; color: var(--text-strong); letter-spacing: -0.01em; }
     header .tag { font-size: 0.6rem; padding: 0.125rem 0.4rem; background: var(--overlay-medium); color: var(--text-muted); font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; border: 1px solid var(--border); }
+    header .session-timer { font-size: 0.65rem; padding: 0.2rem 0.5rem; background: rgba(245,158,11,0.1); color: var(--amber); font-weight: 500; border: 1px solid rgba(245,158,11,0.3); font-variant-numeric: tabular-nums; }
+    header .session-timer.expired { background: rgba(239,68,68,0.1); color: var(--red); border-color: rgba(239,68,68,0.3); }
     header .actions { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
     .header-btn {
       font-size: 0.725rem; font-weight: 500; padding: 0.3rem 0.6rem;
@@ -256,6 +258,7 @@
       <div class="dot"></div>
       <h1>Document Intelligence Pipeline</h1>
       <span class="tag">LlamaIndex + Render</span>
+      <span class="session-timer" id="session-timer" title="Demo session expires and data is deleted">Session: --:--</span>
     </div>
     <div class="actions">
       <a href="https://render.com/deploy?repo=https://github.com/ojusave/render-workflows-llamaindex" target="_blank">
@@ -286,6 +289,7 @@
         <div id="welcome" class="welcome">
           <h2>Document Intelligence</h2>
           <p>Upload any document and watch the pipeline classify it, parse its content, and extract structured data: all powered by LlamaCloud and orchestrated by Render Workflows.</p>
+          <p style="font-size:0.7rem;color:var(--amber);margin-bottom:0.5rem">This is a demo session. Your documents will be automatically deleted when the session expires. No data is stored permanently.</p>
           <div class="drop-zone" id="drop-zone">
             <h3>Drop a file here</h3>
             <p>PDF, DOCX, XLSX, images, HTML, and 130+ more formats</p>
@@ -371,6 +375,71 @@
       return 'https://render.com/register?' + params.toString();
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Session management
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Extract session token from URL path: /s/{token}
+    function getSessionToken() {
+      const match = window.location.pathname.match(/^\/s\/([a-f0-9-]+)/i);
+      return match ? match[1] : null;
+    }
+
+    const SESSION_TOKEN = getSessionToken();
+    const API_BASE = SESSION_TOKEN ? `/s/${SESSION_TOKEN}` : '';
+
+    let sessionExpiresAt = null;
+    let sessionTimerInterval = null;
+
+    async function loadSessionInfo() {
+      if (!SESSION_TOKEN) return;
+      try {
+        const res = await fetch(`${API_BASE}/session`);
+        if (!res.ok) {
+          window.location.href = '/';
+          return;
+        }
+        const data = await res.json();
+        sessionExpiresAt = new Date(data.expires_at);
+        startSessionTimer();
+      } catch (e) {
+        console.error('Failed to load session info:', e);
+      }
+    }
+
+    function startSessionTimer() {
+      const timerEl = document.getElementById('session-timer');
+      const update = () => {
+        if (!sessionExpiresAt) return;
+        const now = new Date();
+        const diff = Math.max(0, Math.floor((sessionExpiresAt - now) / 1000));
+        const mins = Math.floor(diff / 60);
+        const secs = diff % 60;
+        timerEl.textContent = `Session: ${mins}:${String(secs).padStart(2, '0')}`;
+        if (diff <= 0) {
+          timerEl.classList.add('expired');
+          timerEl.textContent = 'Session expired';
+          clearInterval(sessionTimerInterval);
+          showSessionExpired();
+        } else if (diff <= 60) {
+          timerEl.classList.add('expired');
+        }
+      };
+      update();
+      sessionTimerInterval = setInterval(update, 1000);
+    }
+
+    function showSessionExpired() {
+      const main = document.getElementById('main');
+      main.innerHTML = `
+        <div class="welcome">
+          <h2>Session Expired</h2>
+          <p>Your demo session has expired and all uploaded documents have been deleted. This is a demo app that doesn't store any data permanently.</p>
+          <a href="/" class="header-btn primary" style="margin-top:1rem;display:inline-block">Start New Session</a>
+        </div>
+      `;
+    }
+
     // State
     let currentView = 'welcome';
     let pipelineRunning = false;
@@ -453,7 +522,7 @@
       let sseBuffer = '';
 
       try {
-        const response = await fetch('/upload-url', {
+        const response = await fetch(`${API_BASE}/upload-url`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url }),
@@ -557,7 +626,7 @@
 
       // Use fetch with manual stream reading for broadest compatibility
       try {
-        const response = await fetch('/upload', { method: 'POST', body: formData });
+        const response = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
 
         if (!response.ok) {
           addActivity(feed, 'Upload failed: HTTP ' + response.status, 'error');
@@ -699,7 +768,7 @@
     // Document list
     async function loadDocuments() {
       try {
-        const res = await fetch('/documents');
+        const res = await fetch(`${API_BASE}/documents`);
         const docs = await res.json();
         const list = document.getElementById('doc-list');
 
@@ -734,7 +803,7 @@
       container.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem">Loading...</div>';
 
       try {
-        const res = await fetch('/documents/' + id);
+        const res = await fetch(`${API_BASE}/documents/${id}`);
         const doc = await res.json();
 
         const parts = [];
@@ -793,7 +862,7 @@
 
     async function deleteDoc(id) {
       if (!confirm('Delete this document?')) return;
-      await fetch('/documents/' + id, { method: 'DELETE' });
+      await fetch(`${API_BASE}/documents/${id}`, { method: 'DELETE' });
       showView('welcome');
       loadDocuments();
     }
@@ -814,7 +883,7 @@
       sourcesEl.innerHTML = '';
 
       try {
-        const res = await fetch('/ask', {
+        const res = await fetch(`${API_BASE}/ask`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ question }),
@@ -849,7 +918,7 @@
       container.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem">Searching...</div>';
 
       try {
-        const res = await fetch('/search', {
+        const res = await fetch(`${API_BASE}/search`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query }),
@@ -907,6 +976,8 @@
       if (e.key === 'Enter') doSearch();
     });
 
+    // Initialize session and load documents
+    loadSessionInfo();
     loadDocuments();
   </script>
 </body>

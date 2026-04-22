@@ -123,17 +123,21 @@ When this value is present:
 | `LLAMACLOUD_PIPELINE_ID` | Both | optional | [LlamaCloud pipeline](https://cloud.llamaindex.ai) ID for semantic search and Ask retrieval |
 | `WORKFLOW_SLUG` | Web service | `render-workflows-llamaindex-workflow` | Must match the workflow service name exactly |
 | `MAX_UPLOAD_BYTES` | Web service | `104857600` | Max file size in bytes for uploads, URL downloads, and the first workflow dispatch payload |
-| `DOCUMENT_RETENTION_MINUTES` | Web service | `10` | Delete `documents` rows older than this many minutes. Set `0` to keep all rows. |
-| `DOCUMENT_PURGE_INTERVAL_MS` | Web service | `60000` | How often the web process runs retention cleanup |
+| `SESSION_LIFETIME_MINUTES` | Web service | `15` | Ephemeral session lifetime. Sessions and their documents are automatically deleted after this many minutes. |
+| `SESSION_PURGE_INTERVAL_MS` | Web service | `60000` | How often the web process runs session cleanup |
 | `PORT` | Web service | `3000` | [Set automatically by Render](https://render.com/docs/environment-variables#all-runtimes) |
 
 ## Use it after deploy
 
 1. Open the web service URL from the Render dashboard.
-2. Upload a file or paste a document URL.
-3. Watch the activity stream as each pipeline stage completes.
-4. Open the **Documents** list to inspect parsed content and structured output.
-5. If `LLAMACLOUD_PIPELINE_ID` is configured, use **Search** and **Ask** against indexed documents.
+2. You'll be redirected to a unique session URL (`/s/{token}`).
+3. Upload a file or paste a document URL.
+4. Watch the activity stream as each pipeline stage completes.
+5. Open the **Documents** list to inspect parsed content and structured output.
+6. If `LLAMACLOUD_PIPELINE_ID` is configured, use **Search** and **Ask** against indexed documents.
+
+> [!NOTE]
+> **Ephemeral sessions**: Each visitor gets a unique session that expires after 15 minutes (configurable via `SESSION_LIFETIME_MINUTES`). When a session expires, all uploaded documents are automatically deleted. This ensures the demo doesn't store anyone's data permanently and keeps each user's data isolated.
 
 > [!TIP]
 > `Ask` currently retrieves and formats relevant passages from the LlamaCloud pipeline. It does not call a separate answer-generation model yet.

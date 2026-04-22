@@ -1,9 +1,12 @@
 /**
  * Express web server for the document intelligence pipeline.
  * SSE streaming uses native res.write() which flushes immediately.
+ *
+ * Ephemeral sessions: Each visitor gets a unique URL (/s/{token}) with isolated
+ * data that auto-expires after SESSION_LIFETIME_MINUTES (default 15).
  */
 
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import multer from "multer";
 import fs from "fs";
@@ -16,7 +19,11 @@ import {
   listDocuments,
   getDocument,
   deleteDocument,
-  purgeDocumentsOlderThan,
+  createSession,
+  getSessionByToken,
+  purgeExpiredSessions,
+  SESSION_LIFETIME_MINUTES,
+  type Session,
 } from "./shared/db.js";
 import { retrieveFromConfiguredPipeline } from "./shared/pipeline-retrieval.js";
 import { streamPipeline } from "./pipeline-stream.js";
@@ -37,19 +44,20 @@ const UPLOAD_URL_FETCH_TIMEOUT_MS = parseInt(
   10
 );
 
-/** Drop document rows older than this many minutes (0 = disable). Default 10 for demo hygiene. */
-const DOCUMENT_RETENTION_MINUTES = (() => {
-  const raw = process.env.DOCUMENT_RETENTION_MINUTES;
-  if (raw === undefined || raw === "") return 10;
-  const n = parseInt(raw, 10);
-  return Number.isFinite(n) && n >= 0 ? n : 10;
-})();
-
-/** How often to run retention purge (ms). Default 60s so expiry stays near the window. */
-const DOCUMENT_PURGE_INTERVAL_MS = parseInt(
-  process.env.DOCUMENT_PURGE_INTERVAL_MS || "60000",
+/** How often to run session purge (ms). Default 60s. */
+const SESSION_PURGE_INTERVAL_MS = parseInt(
+  process.env.SESSION_PURGE_INTERVAL_MS || "60000",
   10
 );
+
+/** Extend Express Request to include session */
+declare global {
+  namespace Express {
+    interface Request {
+      session?: Session;
+    }
+  }
+}
 
 const upload = multer({ dest: UPLOAD_DIR, limits: { fileSize: MAX_UPLOAD_BYTES } });
 const app = express();
@@ -57,22 +65,73 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Health check (no session required)
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.post("/upload", upload.single("file"), async (req, res) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// Session management
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Root: create a new session and redirect to /s/{token} */
+app.get("/", async (_req, res) => {
+  const session = await createSession();
+  res.redirect(`/s/${session.token}`);
+});
+
+/** Session middleware: validates token and attaches session to request */
+async function requireSession(req: Request, res: Response, next: NextFunction) {
+  const token = req.params.token;
+  if (!token || Array.isArray(token)) {
+    res.redirect("/");
+    return;
+  }
+  const session = await getSessionByToken(token);
+  if (!session) {
+    res.redirect("/");
+    return;
+  }
+  req.session = session;
+  next();
+}
+
+/** Serve the app at /s/{token} */
+app.get("/s/:token", requireSession, (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.sendFile(path.join(__dirname, "static", "index.html"));
+});
+
+/** Get session info (for frontend to show expiry countdown) */
+app.get("/s/:token/session", requireSession, (req, res) => {
+  const session = req.session!;
+  res.json({
+    token: session.token,
+    created_at: session.created_at,
+    expires_at: session.expires_at,
+    lifetime_minutes: SESSION_LIFETIME_MINUTES,
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Session-scoped API routes
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.post("/s/:token/upload", requireSession, upload.single("file"), async (req, res) => {
   const file = req.file;
   if (!file) {
     res.status(400).json({ error: "No file provided" });
     return;
   }
   const filename = file.originalname || "document";
-  const documentId = await insertDocument(filename);
+  const documentId = await insertDocument(req.session!.id, filename);
   await streamPipeline(res, documentId, file.path, filename);
 });
 
-app.post("/upload-url", async (req, res) => {
+app.post("/s/:token/upload-url", requireSession, async (req, res) => {
   const { url } = req.body;
   if (!url) {
     res.status(400).json({ error: "No URL provided" });
@@ -107,22 +166,23 @@ app.post("/upload-url", async (req, res) => {
     return;
   }
 
-  const documentId = await insertDocument(filename);
+  const documentId = await insertDocument(req.session!.id, filename);
   await streamPipeline(res, documentId, tempPath, filename);
 });
 
-app.get("/documents", async (_req, res) => {
-  const docs = await listDocuments();
+app.get("/s/:token/documents", requireSession, async (req, res) => {
+  const docs = await listDocuments(req.session!.id);
   res.json(docs);
 });
 
-app.get("/documents/:id", async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+app.get("/s/:token/documents/:id", requireSession, async (req, res) => {
+  const rawId = req.params.id;
+  const id = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid ID" });
     return;
   }
-  const doc = await getDocument(id);
+  const doc = await getDocument(req.session!.id, id);
   if (!doc) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -130,13 +190,14 @@ app.get("/documents/:id", async (req, res) => {
   res.json(doc);
 });
 
-app.delete("/documents/:id", async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+app.delete("/s/:token/documents/:id", requireSession, async (req, res) => {
+  const rawId = req.params.id;
+  const id = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid ID" });
     return;
   }
-  const deleted = await deleteDocument(id);
+  const deleted = await deleteDocument(req.session!.id, id);
   if (!deleted) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -144,7 +205,7 @@ app.delete("/documents/:id", async (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.post("/search", async (req, res) => {
+app.post("/s/:token/search", requireSession, async (req, res) => {
   const { query } = req.body;
   if (!query) {
     res.status(400).json({ error: "Query is required" });
@@ -164,7 +225,7 @@ app.post("/search", async (req, res) => {
   }
 });
 
-app.post("/ask", async (req, res) => {
+app.post("/s/:token/ask", requireSession, async (req, res) => {
   const { question } = req.body;
   if (!question) {
     res.status(400).json({ error: "Question is required" });
@@ -194,38 +255,31 @@ app.post("/ask", async (req, res) => {
   }
 });
 
+// Static assets (shared across sessions)
 app.use(express.static(path.join(__dirname, "static"), { maxAge: 0, etag: false }));
-
-app.get("/", (_req, res) => {
-  res.set("Cache-Control", "no-store");
-  res.sendFile(path.join(__dirname, "static", "index.html"));
-});
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 initDb()
   .then(() => {
     console.log("Database initialized");
-    if (DOCUMENT_RETENTION_MINUTES > 0) {
-      const runPurge = () => {
-        purgeDocumentsOlderThan(DOCUMENT_RETENTION_MINUTES)
-          .then((n) => {
-            if (n > 0) {
-              console.log(
-                `Document retention: removed ${n} row(s) older than ${DOCUMENT_RETENTION_MINUTES} minutes`
-              );
-            }
-          })
-          .catch((err) => console.error("Document retention purge failed:", err));
-      };
-      runPurge();
-      setInterval(runPurge, DOCUMENT_PURGE_INTERVAL_MS);
-      console.log(
-        `Document retention: purge every ${DOCUMENT_PURGE_INTERVAL_MS}ms, keep rows newer than ${DOCUMENT_RETENTION_MINUTES} minutes`
-      );
-    } else {
-      console.log("Document retention: disabled (DOCUMENT_RETENTION_MINUTES=0)");
-    }
+
+    // Session purge: delete expired sessions (CASCADE deletes their documents)
+    const runPurge = () => {
+      purgeExpiredSessions()
+        .then((n) => {
+          if (n > 0) {
+            console.log(`Session cleanup: removed ${n} expired session(s) and their documents`);
+          }
+        })
+        .catch((err) => console.error("Session purge failed:", err));
+    };
+    runPurge();
+    setInterval(runPurge, SESSION_PURGE_INTERVAL_MS);
+    console.log(
+      `Ephemeral sessions: ${SESSION_LIFETIME_MINUTES} min lifetime, purge every ${SESSION_PURGE_INTERVAL_MS}ms`
+    );
+
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
