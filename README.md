@@ -41,17 +41,9 @@ It is a good fit for teams already on Render who want a working LlamaCloud integ
 
 ## Architecture
 
-These diagrams match the current code paths in [`main.ts`](main.ts), [`pipeline/orchestrator.ts`](pipeline/orchestrator.ts), and [`tasks/`](tasks).
+![Architecture](static/images/architecture.png)
 
-### System layout
-
-![System layout](static/images/architecture-diagram.svg)
-
-### Pipeline flow
-
-![Pipeline flow](static/images/pipeline-flow.svg)
-
-The web service accepts file uploads or URLs, reads bytes from disk, and dispatches five [workflow tasks](https://render.com/docs/workflows-defining). Nothing in that chain blocks the HTTP thread beyond streaming status updates back to the browser.
+The Express API accepts uploads, streams progress via SSE, and dispatches work to Render Workflows. Each workflow task calls the corresponding LlamaCloud API (Files, Classify, LlamaParse, LlamaExtract) and stores results in Postgres.
 
 ### Workflow stages
 
