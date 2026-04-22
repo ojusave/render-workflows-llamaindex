@@ -31,8 +31,8 @@ export const extractFields = task(
         prompt: `Extract all key fields and structured information from this ${docType} document. Include dates, names, identifiers, amounts, and any important data points.`,
       });
       const params = generated.parameters;
-      if ("data_schema" in params) {
-        schema = params.data_schema as DataSchema;
+      if (params && "data_schema" in params) {
+        schema = (params as { data_schema: DataSchema }).data_schema;
       } else {
         schema = {
           type: "object",
@@ -55,7 +55,6 @@ export const extractFields = task(
       file_input: fileId,
       configuration: {
         data_schema: schema,
-        cite_sources: true,
         confidence_scores: true,
       },
     });

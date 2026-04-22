@@ -36,26 +36,39 @@ export const classifyDocument = task(
   }> {
     const client = getLlamaClient();
 
-    const job = await client.classify.create({
-      file_input: fileId,
-      configuration: { rules: CLASSIFICATION_RULES },
-    });
+    console.log(`[classify] Starting classification for file: ${fileId}`);
 
-    const poll = async () => {
-      while (true) {
-        const status = await client.classify.get(job.id);
-        if (status.status === "COMPLETED") return status;
-        if (status.status === "FAILED") throw new Error(status.error_message ?? "Classify failed");
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-    };
+    const response = await client.classify.run(
+      {
+        file_input: fileId,
+        configuration: { rules: CLASSIFICATION_RULES },
+      },
+      { verbose: true }
+    );
 
-    const result = await poll();
+    console.log(`[classify] Job status: ${response.status}`);
+    console.log(`[classify] Result:`, JSON.stringify(response.result, null, 2));
+
+    if (response.status === "FAILED") {
+      const errorMsg = response.error_message ?? "Classification failed";
+      console.error(`[classify] Error: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+
+    // If result is null, classification completed but didn't match any rule
+    if (!response.result) {
+      console.log(`[classify] No classification result - document may not match any rules`);
+      return {
+        docType: "general",
+        confidence: 0,
+        reasoning: "Document did not strongly match any predefined category",
+      };
+    }
 
     return {
-      docType: result.result?.type ?? "unknown",
-      confidence: result.result?.confidence ?? 0,
-      reasoning: result.result?.reasoning ?? "",
+      docType: response.result.type ?? "general",
+      confidence: response.result.confidence ?? 0,
+      reasoning: response.result.reasoning ?? "",
     };
   }
 );

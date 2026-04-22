@@ -24,18 +24,22 @@ export const parseDocument = task(
       file_id: fileId,
       tier: "agentic",
       version: "latest",
-      expand: ["markdown_full", "text_full", "items"],
+      expand: ["markdown", "text", "items"],
     });
 
     const fullMarkdown = result.markdown_full ?? "";
     const fullText = result.text_full ?? "";
     
-    // Extract page info from items if available
-    const items = (result.items ?? []) as Array<{ page?: number; markdown?: string }>;
-    const pages = items.map((item, idx) => ({
-      pageNumber: item.page ?? idx + 1,
-      markdown: item.markdown ?? "",
-    }));
+    // Extract page info from items.pages if available
+    // result.items is { pages: Array<{ page_number, items, ... }> }
+    const itemsResult = result.items as { pages?: Array<{ page_number: number; items?: unknown[] }> } | null;
+    const rawPages = itemsResult?.pages;
+    const pages = Array.isArray(rawPages)
+      ? rawPages.map((p) => ({
+          pageNumber: p.page_number ?? 1,
+          markdown: "", // Individual page markdown not directly available from items
+        }))
+      : [];
     const pageCount = pages.length > 0 ? pages.length : 1;
 
     return {
