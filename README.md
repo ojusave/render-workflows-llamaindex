@@ -62,7 +62,7 @@ This repo demonstrates how to build document AI applications using:
 
 ### Prerequisites
 
-- [Render account](https://render.com/register) (free tier works)
+- [Render account](https://dashboard.render.com/register?utm_source=github&utm_medium=referral&utm_campaign=ojus_demos&utm_content=readme_link) (free tier works)
 - [LlamaCloud account](https://cloud.llamaindex.ai) (free tier available)
 
 ### Deploy
