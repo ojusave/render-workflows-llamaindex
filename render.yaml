@@ -41,7 +41,6 @@ services:
         value: "15"
         description: "Ephemeral session lifetime in minutes. Sessions and their documents are deleted after expiry."
         required: false
-        sync: false
 
 databases:
   - name: llamaindex-docs-db
