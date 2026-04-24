@@ -2,6 +2,10 @@
  * Workflow task: materialize uploaded bytes to a temp file with the correct
  * extension and register the file with LlamaCloud. Runs on the workflow
  * service so the web tier only reads the upload and dispatches tasks.
+ *
+ * The web service passes the file as base64 in task arguments; keep raw size
+ * within shared/workflow-limits.ts (3 MiB default) to satisfy Render’s ~4MB
+ * per-invocation argument limit.
  */
 
 import fs from "fs";

@@ -102,6 +102,11 @@ This repo demonstrates how to build document AI applications using:
 | `DATABASE_URL` | Both services | Render Postgres connection string |
 | `LLAMACLOUD_PIPELINE_ID` | Both (optional) | Enable [semantic search](https://docs.cloud.llamaindex.ai/llamacloud/guides/pipelines) |
 | `SESSION_LIFETIME_MINUTES` | Web service | Session duration before cleanup (default: 15) |
+| `MAX_UPLOAD_BYTES` | Web service (optional) | **Default 3,145,728 (3 MiB), hard-capped at that value.** The first pipeline step (`upload_to_llamacloud`) passes the file as **base64** in [`startTask`](https://render.com/docs/workflows) arguments. [Render Workflows limits](https://render.com/docs/workflows-limits) per-invocation argument size to **4MB**; base64 inflates by ~4/3, so ~3MB raw is the safe maximum. Set lower to tighten the demo. |
+
+## Upload size limit (important)
+
+The demo sends file bytes to the `upload_to_llamacloud` task as a base64 string in the workflow task parameters. **Per Render’s limits, task arguments are capped at 4MB**, so the effective max **raw** file size is **3 MiB** (3,145,728 bytes). The app enforces this in the API, the orchestrator, and the UI. To support larger files in production, store uploads in object storage and pass only a file ID to the task (see [Render Workflows](https://render.com/docs/workflows)).
 
 ## Privacy & Demo Mode
 
@@ -152,6 +157,7 @@ All document routes are session-scoped under `/s/{token}/`.
 | Database connection errors | Use the Postgres **Internal URL**, not External |
 | Search returns "not configured" | Set `LLAMACLOUD_PIPELINE_ID` on both services |
 | "Unsupported file type" | Ensure filename has a valid extension (`.pdf`, `.docx`, etc.) |
+| "File too large" / upload over ~3MB | [Workflow argument size](#upload-size-limit-important) — use a smaller file or redesign with external storage + file reference |
 | LlamaCloud rate limits | Tasks retry automatically; check your [LlamaCloud dashboard](https://cloud.llamaindex.ai) |
 
 ## Learn More

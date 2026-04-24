@@ -296,6 +296,8 @@
           <div class="drop-zone" id="drop-zone">
             <h3>Drop a file here</h3>
             <p>PDF, DOCX, XLSX, images, HTML, and 130+ more formats</p>
+            <p id="max-upload-hint" style="font-size:0.7rem;color:var(--text-dim);margin:0.35rem 0 0;max-width:22rem">Max 3 MB per file — the upload step passes your file to Render Workflows in task args (4MB cap after base64).</p>
+            <p id="upload-size-error" style="font-size:0.7rem;color:var(--red);margin:0.25rem 0 0;max-width:22rem;min-height:0;display:none" role="alert"></p>
             <button class="browse-btn" onclick="document.getElementById('file-input').click()">Browse files</button>
             <input type="file" id="file-input" />
           </div>
@@ -393,6 +395,14 @@
 
     let sessionExpiresAt = null;
     let sessionTimerInterval = null;
+    let maxUploadBytes = 3 * 1024 * 1024;
+
+    function formatMaxUpload(bytes) {
+      if (bytes >= 1024 * 1024) {
+        return (bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '') + ' MB';
+      }
+      return Math.round(bytes / 1024) + ' KB';
+    }
 
     async function loadSessionInfo() {
       if (!SESSION_TOKEN) return;
@@ -404,6 +414,13 @@
         }
         const data = await res.json();
         sessionExpiresAt = new Date(data.expires_at);
+        if (typeof data.max_upload_bytes === 'number' && data.max_upload_bytes > 0) {
+          maxUploadBytes = data.max_upload_bytes;
+        }
+        const hint = document.getElementById('max-upload-hint');
+        if (hint) {
+          hint.textContent = 'Max ' + formatMaxUpload(maxUploadBytes) + ' per file — the upload task receives your file as base64 in Render Workflows task args (~4MB platform limit).';
+        }
         startSessionTimer();
       } catch (e) {
         console.error('Failed to load session info:', e);
@@ -589,6 +606,13 @@
 
     // Upload and stream pipeline
     async function uploadFile(file) {
+      const errEl = document.getElementById('upload-size-error');
+      if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+      if (file.size > maxUploadBytes) {
+        const msg = 'File is too large (max ' + formatMaxUpload(maxUploadBytes) + '). Render Workflows limits the size of data passed to a task. See the README for details.';
+        if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+        return;
+      }
       pipelineRunning = true;
       showView('pipeline');
       document.getElementById('pipeline-filename').textContent = file.name;

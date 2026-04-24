@@ -33,6 +33,7 @@ const MIN_SESSION_TIME_FOR_UPLOAD = 10;
 import { retrieveFromConfiguredPipeline } from "./shared/pipeline-retrieval.js";
 import { streamPipeline } from "./pipeline-stream.js";
 import { filenameWithExtFromContentType } from "./shared/filename-ext.js";
+import { resolveMaxUploadBytes } from "./shared/workflow-limits.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, ".uploads");
@@ -40,10 +41,8 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const PIPELINE_ID = process.env.LLAMACLOUD_PIPELINE_ID;
 
-const MAX_UPLOAD_BYTES = parseInt(
-  process.env.MAX_UPLOAD_BYTES || String(100 * 1024 * 1024),
-  10
-);
+/** Capped at 3 MiB by default: workflow task args (base64 file) must stay under Render's ~4MB limit. */
+const MAX_UPLOAD_BYTES = resolveMaxUploadBytes();
 const UPLOAD_URL_FETCH_TIMEOUT_MS = parseInt(
   process.env.UPLOAD_URL_FETCH_TIMEOUT_MS || "120000",
   10
@@ -118,6 +117,7 @@ app.get("/s/:token/session", requireSession, (req, res) => {
     created_at: session.created_at,
     expires_at: session.expires_at,
     lifetime_minutes: SESSION_LIFETIME_MINUTES,
+    max_upload_bytes: MAX_UPLOAD_BYTES,
   });
 });
 

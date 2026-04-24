@@ -4,7 +4,7 @@
  *
  * Flow (all LlamaCloud work runs on the workflow service except reading the
  * temp upload on this host to send bytes to the first task):
- *   1. upload_to_llamacloud → LlamaCloud file_id
+ *   1. upload_to_llamacloud → LlamaCloud file_id (base64 in task args; size cap in shared/workflow-limits.ts)
  *   2. classify_document → doc type + confidence
  *   3. parse_document → markdown + text
  *   4. extract_fields → structured JSON
@@ -15,13 +15,11 @@
 
 import { Render } from "@renderinc/sdk";
 import fs from "fs";
+import { resolveMaxUploadBytes } from "../shared/workflow-limits.js";
 
 const WORKFLOW_SLUG = process.env.WORKFLOW_SLUG || "render-workflows-llamaindex-workflow";
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || "3000", 10);
-const MAX_UPLOAD_BYTES = parseInt(
-  process.env.MAX_UPLOAD_BYTES || String(100 * 1024 * 1024),
-  10
-);
+const MAX_UPLOAD_BYTES = resolveMaxUploadBytes();
 
 const render = new Render();
 
