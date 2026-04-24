@@ -202,12 +202,6 @@
       font-family: 'SF Mono', 'Fira Code', monospace;
     }
 
-    .dashboard-link {
-      display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; font-weight: 500;
-      color: var(--render-purple); padding: 0.3rem 0.6rem; border: 1px solid rgba(108,99,255,0.25);
-      background: rgba(108,99,255,0.06); transition: all 0.15s; margin-top: 0.75rem; text-decoration: none;
-    }
-    .dashboard-link:hover { background: rgba(108,99,255,0.12); border-color: rgba(108,99,255,0.4); text-decoration: none; }
     .activity-error { color: var(--red); font-size: 0.8rem; margin-top: 0.75rem; }
 
     .stats-row {
@@ -327,10 +321,6 @@
             <span id="pipeline-timer" style="font-size:0.7rem;color:var(--text-dim);font-variant-numeric:tabular-nums;margin-left:auto">0:00</span>
           </div>
           <div class="activity-feed" id="activity-feed"></div>
-          <a href="https://dashboard.render.com/" target="_blank" class="dashboard-link" id="dashboard-link">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            Watch tasks in the Render Dashboard
-          </a>
           <div id="pipeline-error" class="activity-error"></div>
           <div id="result-section"></div>
         </div>
