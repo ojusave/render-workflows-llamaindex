@@ -153,19 +153,30 @@
 
     .activity-feed { display: flex; flex-direction: column; gap: 0; }
     .activity-item {
-      display: flex; align-items: flex-start; gap: 0.625rem; padding: 0.5rem 0;
+      display: flex; align-items: stretch; gap: 0; padding: 0.5rem 0;
       font-size: 0.8rem; color: var(--text-muted); animation: fadeUp 0.3s ease-out;
-      border-left: 2px solid var(--border); padding-left: 0.875rem; margin-left: 3px;
     }
-    .activity-item:last-child { border-left-color: transparent; }
+    .activity-item .activity-track {
+      display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
+      width: 12px; margin-right: 0.625rem; min-height: 1rem; padding-top: 0.15rem;
+    }
     .activity-item .indicator {
-      width: 10px; height: 10px; flex-shrink: 0; margin-top: 0.2rem; margin-left: -1.45rem;
-      border-radius: 50%; background: var(--border); position: relative;
+      width: 10px; height: 10px; flex-shrink: 0; z-index: 1;
+      border-radius: 50%; background: var(--border);
     }
+    .activity-item .activity-track::after {
+      content: "";
+      flex: 1 1 0.35rem;
+      width: 2px; min-height: 0.35rem;
+      margin-top: 2px;
+      background: var(--border);
+      border-radius: 1px;
+    }
+    .activity-item:last-child .activity-track::after { display: none; }
     .activity-item.active .indicator { background: var(--render-purple); box-shadow: 0 0 8px rgba(108,99,255,0.5); animation: pulse 1.5s ease-in-out infinite; }
     .activity-item.done .indicator { background: var(--green); }
     .activity-item.error .indicator { background: var(--red); }
-    .activity-item .label { flex: 1; line-height: 1.5; }
+    .activity-item .label { flex: 1; line-height: 1.5; min-width: 0; padding-top: 0.1rem; }
     .activity-item .label strong { color: var(--text); font-weight: 600; }
     .activity-item.done .label { color: var(--text-dim); }
     .activity-item.active .label { color: var(--text); }
@@ -698,7 +709,7 @@
       }
       const item = document.createElement('div');
       item.className = 'activity-item ' + (state || '');
-      item.innerHTML = '<div class="indicator"></div><div class="label">' + text + '</div>';
+      item.innerHTML = '<div class="activity-track"><div class="indicator"></div></div><div class="label">' + text + '</div>';
       feed.appendChild(item);
       item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       return item;
